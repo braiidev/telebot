@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory
 
 import bot
 import db
@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return redirect("/?error=Ruta+inexistente")
 
 _sse_queues = []
 _sse_lock = threading.Lock()
@@ -272,8 +277,11 @@ def events():
 def start_flask():
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8080))
+    debug = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+    if debug:
+        logger.warning("DEBUG mode enabled — do not use in production!")
     logger.info(f"Web server on http://{host}:{port}")
-    app.run(host=host, port=port, debug=False, use_reloader=False)
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
 
 
 if __name__ == "__main__":

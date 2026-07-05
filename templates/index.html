@@ -75,6 +75,10 @@
   </div>
 
   <script>
+    // Show error from ?error=... query param
+    const errParam = new URLSearchParams(location.search).get('error');
+    if (errParam) alert(decodeURIComponent(errParam));
+
     let activeContactId = null;
     let contacts = [];
     let blockedOnly = false;
