@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeBot</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a1a2e'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-weight='900' font-size='48' fill='%23e94560'%3EHB%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="header">
+      <h1>HomeBot</h1>
+        <div id="header-actions">
+          <button id="btn-theme" class="icon-btn" title="Cambiar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+          <button id="btn-custom-theme" class="icon-btn" title="Personalizar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.83-.12 2.68-.35a1 1 0 0 0 .82-1.12 2.04 2.04 0 0 1 1.46-2.4A2.04 2.04 0 0 0 18 16a2 2 0 0 1 2-2 1 1 0 0 0 1.05-.86A10 10 0 0 0 12 2z"/></svg></button>
+          <button id="btn-data" class="icon-btn" title="Administrar datos"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></button>
+          <span id="status">conectando...</span>
+        </div>
+    </div>
+
+    <div id="main">
+      <div id="chat-panel">
+        <div id="chat-placeholder">
+          <p>Selecciona un contacto para chatear</p>
+        </div>
+        <div id="chat-active" class="hidden">
+          <div id="chat-header"></div>
+          <div id="messages"></div>
+          <div id="input-area" style="position:relative">
+            <div class="emoji-panel" id="emoji-panel"></div>
+            <input type="text" id="input" placeholder="Escribe un mensaje..." autofocus>
+            <button class="emoji-btn" id="btn-emoji" title="Emojis"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+            <button id="btn-file" title="Adjuntar archivo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+            <button id="send-btn">Enviar</button>
+            <input type="file" id="file-input" hidden>
+          </div>
+        </div>
+      </div>
+
+      <aside id="sidebar">
+        <div id="sidebar-header">
+          <h2>Contactos</h2>
+          <button id="btn-add-contact" title="Añadir contacto">+</button>
+        </div>
+        <div id="contact-search">
+          <input type="text" id="contact-filter" placeholder="Buscar...">
+        </div>
+        <ul id="contact-list"></ul>
+        <div id="sidebar-footer">
+          <button id="btn-show-all" class="hidden">Mostrar todos</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <div id="modal-header">
+        <h3 id="modal-title">Contacto</h3>
+        <button id="modal-close">&times;</button>
+      </div>
+      <div id="modal-body"></div>
+      <div id="modal-footer"></div>
+    </div>
+  </div>
+
+  <script>
+    let activeContactId = null;
+    let contacts = [];
+    let blockedOnly = false;
+    let uploadingFile = false;
+
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const statusEl = document.getElementById('status');
+    const contactList = document.getElementById('contact-list');
+    const chatPlaceholder = document.getElementById('chat-placeholder');
+    const chatActive = document.getElementById('chat-active');
+    const chatHeader = document.getElementById('chat-header');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer');
+    const modalTitle = document.getElementById('modal-title');
+    const filterInput = document.getElementById('contact-filter');
+    const fileInput = document.getElementById('file-input');
+    const btnFile = document.getElementById('btn-file');
+
+    function esc(str) {
+      const d = document.createElement('div');
+      d.textContent = str || '';
+      return d.innerHTML;
+    }
+
+    function scrollBottom() {
+      requestAnimationFrame(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    }
+
+    messagesEl.addEventListener('load', (e) => {
+      if (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO') {
+        if (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80) {
+          scrollBottom();
+        }
+      }
+    }, true);
+
+    function formatTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function displayTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      const now = new Date();
+      const diff = (now - d) / 1000;
+      if (diff < 86400) return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+    }
+
+    function fileIcon(type) {
+      if (type === 'audio') return '🎵';
+      if (type === 'video') return '🎬';
+      if (type === 'image') return '📷';
+      return '📄';
+    }
+
+    function formatSize(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      let size = bytes;
+      while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+      return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+
+    function showDeletedFallback(container, msg) {
+      const del = document.createElement('div');
+      del.className = 'msg-file-deleted';
+      del.innerHTML = fileIcon(msg.file_type) + ' <em>' + (msg.file_name || 'Archivo ' + msg.file_type) + '</em> — no disponible';
+      container.appendChild(del);
+    }
+
+    function renderMessage(msg) {
+      const div = document.createElement('div');
+      div.className = 'message ' + msg.sender;
+      const text = document.createElement('div');
+      text.className = 'text';
+
+      if (msg.file_type === 'image' && msg.file_path) {
+        const img = document.createElement('img');
+        img.className = 'msg-file msg-image';
+        img.src = '/data/' + msg.file_path;
+        img.loading = 'lazy';
+        img.addEventListener('click', () => window.open('/data/' + msg.file_path, '_blank'));
+        img.addEventListener('error', () => { img.style.display = 'none'; showDeletedFallback(text, msg); });
+        text.appendChild(img);
+        if (msg.text) {
+          const cap = document.createElement('div');
+          cap.textContent = msg.text;
+          text.appendChild(cap);
+        }
+      } else if (msg.file_type === 'audio' && msg.file_path) {
+        const audio = document.createElement('audio');
+        audio.className = 'msg-file msg-audio';
+        const ext = msg.file_path.split('.').pop().toLowerCase();
+        const mime = ext === 'ogg' ? 'audio/ogg; codecs=opus' : ext === 'mp3' ? 'audio/mpeg' : ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/mp4' : '';
+        if (mime) audio.setAttribute('type', mime);
+        audio.src = '/data/' + msg.file_path;
+        audio.controls = true;
+        audio.preload = 'metadata';
+        audio.addEventListener('error', () => { audio.remove(); showDeletedFallback(text, msg); });
+        text.appendChild(audio);
+        if (msg.text) {
+          const cap = document.createElement('div');
+          cap.textContent = msg.text;
+          text.appendChild(cap);
+        }
+      } else if (msg.file_type === 'video' && msg.file_path) {
+        const video = document.createElement('video');
+        video.className = 'msg-file msg-video';
+        video.src = '/data/' + msg.file_path;
+        video.controls = true;
+        video.preload = 'metadata';
+        video.addEventListener('error', () => { video.remove(); showDeletedFallback(text, msg); });
+        text.appendChild(video);
+        if (msg.text) {
+          const cap = document.createElement('div');
+          cap.textContent = msg.text;
+          text.appendChild(cap);
+        }
+      } else if (msg.file_type && msg.file_path) {
+        const link = document.createElement('a');
+        link.className = 'msg-file msg-document';
+        link.href = '/data/' + msg.file_path;
+        link.target = '_blank';
+        link.textContent = (msg.file_name || 'Documento') + ' ' + (msg.file_size ? '(' + (msg.file_size / 1024).toFixed(0) + ' KB)' : '');
+        link.addEventListener('click', (e) => {
+          fetch(link.href, { method: 'HEAD' }).then(r => { if (!r.ok) { e.preventDefault(); showDeletedFallback(text, msg); }});
+        });
+        text.appendChild(link);
+        if (msg.text) {
+          const cap = document.createElement('div');
+          cap.textContent = msg.text;
+          text.appendChild(cap);
+        }
+      } else if (msg.file_type && !msg.file_path) {
+        showDeletedFallback(text, msg);
+        if (msg.text && !msg.text.includes('[Archivo eliminado')) {
+          const cap = document.createElement('div');
+          cap.textContent = msg.text;
+          text.appendChild(cap);
+        }
+      } else if (msg.text) {
+        text.textContent = msg.text;
+      }
+
+      const time = document.createElement('div');
+      time.className = 'time';
+      time.textContent = formatTime(msg.created_at);
+      div.appendChild(text);
+      div.appendChild(time);
+      return div;
+    }
+
+    function appendMessage(msg) {
+      if (msg.contact_id !== activeContactId) return;
+      const exists = messagesEl.querySelector(`[data-id="${msg.id}"]`);
+      if (exists) return;
+      const el = renderMessage(msg);
+      el.setAttribute('data-id', msg.id);
+      messagesEl.appendChild(el);
+      scrollBottom();
+
+      if (msg.sender === 'them') {
+        fetch(`/api/read/${activeContactId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msg_id: msg.id }),
+        });
+      }
+    }
+
+    function renderContact(c) {
+      const li = document.createElement('li');
+      li.className = 'contact-item';
+      if (c.telegram_id === activeContactId) li.classList.add('active');
+      if (c.blocked) li.classList.add('blocked');
+
+      const name = c.alias || c.name || c.username || String(c.telegram_id);
+      const subtitle = c.alias && c.name ? c.name : '';
+      let preview = c.last_message || '';
+      if (c.file_type && !c.last_message) preview = '[' + c.file_type + ']';
+
+      li.innerHTML = `
+        <div class="ci-avatar">
+          ${c.avatar ? `<img src="/data/avatars/${c.telegram_id}.jpg" class="ci-avatar-img" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">` : ''}
+          <span class="ci-avatar-text">${esc(name[0]).toUpperCase()}</span>
+        </div>
+        <div class="ci-info">
+          <div class="ci-name">${esc(name)}</div>
+          ${subtitle ? `<div class="ci-sub">${esc(subtitle)}</div>` : ''}
+          <div class="ci-preview">${esc(preview)}</div>
+        </div>
+        <div class="ci-meta">
+          ${c.last_message_at ? `<div class="ci-time">${displayTime(c.last_message_at)}</div>` : ''}
+          ${c.unread_count > 0 && c.telegram_id !== activeContactId ? `<div class="ci-badge">${c.unread_count}</div>` : ''}
+          ${c.blocked ? `<div class="ci-blocked"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></div>` : ''}
+        </div>
+      `;
+      li.addEventListener('click', () => selectContact(c.telegram_id));
+      return li;
+    }
+
+    function renderContactList(list) {
+      contactList.innerHTML = '';
+      const filtered = blockedOnly ? list.filter(c => c.blocked) : list;
+      filtered.forEach(c => contactList.appendChild(renderContact(c)));
+      document.getElementById('btn-show-all').classList.toggle('hidden', !blockedOnly);
+    }
+
+    async function loadContacts() {
+      try {
+        const res = await fetch('/api/contacts');
+        contacts = await res.json();
+        renderContactList(contacts);
+      } catch (e) {
+        console.error('Error loading contacts:', e);
+      }
+    }
+
+    function closeChat() {
+      activeContactId = null;
+      chatPlaceholder.classList.remove('hidden');
+      chatActive.classList.add('hidden');
+      renderContactList(contacts);
+    }
+
+    async function selectContact(contactId) {
+      if (contactId === activeContactId) return;
+      activeContactId = contactId;
+      chatPlaceholder.classList.add('hidden');
+      chatActive.classList.remove('hidden');
+      renderContactList(contacts);
+
+      const c = contacts.find(x => x.telegram_id === contactId);
+      const name = c ? (c.alias || c.name || c.username || String(contactId)) : String(contactId);
+      chatHeader.innerHTML = `
+        <div class="ch-info">
+          ${c && c.avatar ? `<img src="/data/avatars/${contactId}.jpg" class="ch-avatar" onerror="this.style.display='none'">` : ''}
+          <span class="ch-name">${esc(name)}</span>
+        </div>
+        <div class="ch-actions">
+          <div class="dropdown">
+            <button class="ch-btn dropdown-toggle" title="M\u00e1s">\u22ef</button>
+            <div class="dropdown-menu">
+              <button onclick="openContactDetail(${contactId})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg> Editar</button>
+              <button onclick="archiveContact(${contactId})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Archivar</button>
+              <button class="danger" onclick="deleteChat(${contactId})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> Eliminar chat</button>
+            </div>
+          </div>
+          <button class="ch-btn" onclick="closeChat()" title="Cerrar chat">\u2715</button>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/messages/${contactId}`);
+        const msgs = await res.json();
+        messagesEl.innerHTML = '';
+        msgs.forEach(m => {
+          const el = renderMessage(m);
+          el.setAttribute('data-id', m.id);
+          messagesEl.appendChild(el);
+        });
+        scrollBottom();
+
+        if (msgs.length > 0) {
+          const lastId = msgs[msgs.length - 1].id;
+          await fetch(`/api/read/${contactId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ msg_id: lastId }),
+          });
+          loadContacts();
+        }
+      } catch (e) {
+        console.error('Error loading messages:', e);
+      }
+    }
+
+    async function openContactDetail(contactId) {
+      const c = contacts.find(x => x.telegram_id === contactId);
+      if (!c) return;
+      modalTitle.textContent = 'Detalle del contacto';
+      modalBody.innerHTML = `
+        <div class="form-group">
+          <label>ID de Telegram</label>
+          <input type="text" class="form-input" id="f-id" value="${c.telegram_id}" readonly>
+        </div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" class="form-input" id="f-name" value="${esc(c.name || '')}">
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-input" id="f-username" value="${esc(c.username || '')}">
+        </div>
+        <div class="form-group">
+          <label>Apodo (alias)</label>
+          <input type="text" class="form-input" id="f-alias" value="${esc(c.alias || '')}" placeholder="Nombre visible en la lista">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="f-blocked" ${c.blocked ? 'checked' : ''}>
+            Bloqueado (no recibir mensajes)
+          </label>
+        </div>
+      `;
+      modalFooter.innerHTML = `
+        <button class="btn btn-danger" onclick="deleteContact(${contactId})">Borrar contacto</button>
+        <button class="btn btn-primary" onclick="saveContact(${contactId})">Guardar</button>
+      `;
+      modalOverlay.classList.remove('hidden');
+    }
+
+    async function saveContact(contactId) {
+      const name = document.getElementById('f-name').value.trim();
+      const username = document.getElementById('f-username').value.trim();
+      const alias = document.getElementById('f-alias').value.trim();
+      const blocked = document.getElementById('f-blocked').checked;
+      try {
+        const res = await fetch(`/api/contacts/${contactId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, username, alias, blocked }),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          closeModal();
+          await loadContacts();
+          if (activeContactId === contactId) {
+            const nm = updated.alias || updated.name || updated.username || String(contactId);
+            document.querySelector('#chat-header .ch-name').textContent = nm;
+          }
+        } else {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'desconocido'));
+        }
+      } catch (e) {
+        console.error('Error saving contact:', e);
+      }
+    }
+
+    async function deleteContact(contactId) {
+      if (!confirm('\u00bfEliminar contacto y todos sus mensajes?')) return;
+      try {
+        await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+        closeModal();
+        if (activeContactId === contactId) closeChat();
+        loadContacts();
+      } catch (e) {
+        console.error('Error deleting contact:', e);
+      }
+    }
+
+    async function deleteChat(contactId) {
+      if (!confirm('\u00bfEliminar solo los mensajes de este chat? El contacto se conservar\u00e1.')) return;
+      try {
+        await fetch(`/api/messages/${contactId}`, { method: 'DELETE' });
+        closeModal();
+        if (activeContactId === contactId) closeChat();
+        loadContacts();
+      } catch (e) {
+        console.error('Error deleting chat:', e);
+      }
+    }
+
+    function closeModal() {
+      modalOverlay.classList.add('hidden');
+    }
+
+    // Dropdown menu
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const toggle = e.target.closest('.dropdown-toggle');
+      if (toggle) {
+        e.stopPropagation();
+        const menu = toggle.parentElement.querySelector('.dropdown-menu');
+        menu.classList.toggle('open');
+      }
+    });
+
+    function archiveContact(contactId) {
+      alert('Función Archivar próximamente');
+    }
+
+    // Data manager
+    async function openDataManager() {
+      modalTitle.textContent = 'Administrar datos';
+      modalBody.innerHTML = '<div style="text-align:center;padding:20px"><span class="spinner" style="width:24px;height:24px;border-width:3px"></span><br><br>Cargando...</div>';
+      modalFooter.innerHTML = '<button class="btn" onclick="closeModal()">Cerrar</button>';
+      modalOverlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/data/info');
+        const info = await res.json();
+        renderDataManager(info);
+      } catch (e) {
+        modalBody.innerHTML = '<p style="color:var(--color-danger)">Error al cargar datos</p>';
+      }
+    }
+
+    function renderDataManager(info) {
+      const maxSize = Math.max(...info.folders.map(f => f.size), 1);
+      let html = '<div id="data-manager">';
+      info.folders.forEach(f => {
+        const pct = maxSize > 0 ? (f.size / maxSize * 100) : 0;
+        const icons = {
+          audio: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+          video: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><polygon points="10 8 16 12 10 16 10 8"/></svg>',
+          image: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+          document: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+        };
+        html += `
+          <div class="dm-folder" data-type="${f.type}">
+            <div class="dm-header">
+              <span class="dm-icon">${icons[f.type] || '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'}</span>
+              <span class="dm-name">${f.type.charAt(0).toUpperCase() + f.type.slice(1)}s</span>
+              <span class="dm-count">${f.count} archivos</span>
+              <span class="dm-size">${formatSize(f.size)}</span>
+            </div>
+            <div class="dm-bar"><div class="dm-bar-fill" style="width:${pct}%"></div></div>
+            <label class="dm-check">
+              <input type="checkbox" class="dm-cb" value="${f.type}" ${f.count === 0 ? 'disabled' : 'checked'}>
+              Incluir en limpieza
+            </label>
+          </div>
+        `;
+      });
+      html += '</div>';
+      modalBody.innerHTML = html;
+      modalFooter.innerHTML = `
+        <span style="font-size:12px;color:var(--color-muted);flex:1">${formatSize(info.total_size)} total — ${info.total_files} archivos</span>
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-danger" onclick="confirmClean()">Limpiar seleccionados</button>
+      `;
+    }
+
+    async function confirmClean() {
+      const cbs = document.querySelectorAll('.dm-cb:checked');
+      const types = Array.from(cbs).map(cb => cb.value);
+      if (types.length === 0) return alert('Seleccion\u00e1 al menos un tipo de archivo');
+
+      const mode = types.length === 4 ? 'all' : types[0];
+      const label = types.length === 4 ? 'todos los datos' : types.join(', ');
+      if (!confirm(`\u00bfEliminar ${label}? Esta acci\u00f3n no se puede deshacer.`)) return;
+
+      modalFooter.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin:0 auto"></span>';
+      try {
+        const res = await fetch('/api/data/clean', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: mode }),
+        });
+        const result = await res.json();
+        closeModal();
+        if (result.deleted > 0) {
+          // Reload messages for active chat to show deleted state
+          if (activeContactId) selectContact(activeContactId);
+          loadContacts();
+        }
+      } catch (e) {
+        alert('Error al limpiar datos');
+      }
+    }
+    function openAddContact() {
+      modalTitle.textContent = 'Añadir contacto';
+      modalBody.innerHTML = `
+        <div class="form-group">
+          <label>ID de Telegram *</label>
+          <input type="number" class="form-input" id="f-new-id" placeholder="123456789">
+        </div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" class="form-input" id="f-new-name" placeholder="Nombre visible">
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-input" id="f-new-username" placeholder="@usuario">
+        </div>
+        <div class="form-group">
+          <label>Apodo (alias)</label>
+          <input type="text" class="form-input" id="f-new-alias" placeholder="Cómo aparecerá en tu lista">
+        </div>
+      `;
+      modalFooter.innerHTML = `
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="addContact()">Añadir</button>
+      `;
+      modalOverlay.classList.remove('hidden');
+    }
+
+    async function addContact() {
+      const telegram_id = document.getElementById('f-new-id').value.trim();
+      const name = document.getElementById('f-new-name').value.trim();
+      const username = document.getElementById('f-new-username').value.trim();
+      const alias = document.getElementById('f-new-alias').value.trim();
+      if (!telegram_id) return alert('El ID de Telegram es obligatorio');
+      try {
+        const res = await fetch('/api/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: parseInt(telegram_id),
+            name: name || undefined,
+            username: username || undefined,
+            alias: alias || undefined,
+          }),
+        });
+        if (res.ok) {
+          closeModal();
+          loadContacts();
+        } else {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'desconocido'));
+        }
+      } catch (e) {
+        console.error('Error adding contact:', e);
+      }
+    }
+
+    async function sendMessage() {
+      if (!activeContactId) return;
+      const text = inputEl.value.trim();
+      if (!text) return;
+      inputEl.value = '';
+      inputEl.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span class="spinner"></span>Enviando...';
+      try {
+        const res = await fetch(`/api/send/${activeContactId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'Error al enviar'));
+        }
+      } catch (e) {
+        alert('Error de conexión');
+      } finally {
+        inputEl.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Enviar';
+        inputEl.focus();
+      }
+    }
+
+    btnFile.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file || !activeContactId) return;
+      fileInput.value = '';
+      uploadingFile = true;
+      sendBtn.innerHTML = '<span class="spinner"></span>Subiendo...';
+      sendBtn.disabled = true;
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const caption = inputEl.value.trim();
+        if (caption) form.append('caption', caption);
+        inputEl.value = '';
+
+        const res = await fetch(`/api/upload/${activeContactId}`, {
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'Error al subir archivo'));
+        }
+      } catch (e) {
+        alert('Error al subir archivo');
+      } finally {
+        uploadingFile = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Enviar';
+        inputEl.focus();
+      }
+    });
+
+    function connectSSE() {
+      statusEl.textContent = 'conectando...';
+      statusEl.className = '';
+      const evtSource = new EventSource('/api/events');
+      evtSource.onopen = () => {
+        statusEl.textContent = 'conectado';
+        statusEl.className = 'connected';
+      };
+      evtSource.onmessage = (e) => {
+        if (!e.data) return;
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'data_cleaned') {
+            if (msg.affected && activeContactId) {
+              // Reload messages for active contact to show deleted states
+              fetch(`/api/messages/${activeContactId}`).then(r => r.json()).then(msgs => {
+                messagesEl.innerHTML = '';
+                msgs.forEach(m => {
+                  const el = renderMessage(m);
+                  el.setAttribute('data-id', m.id);
+                  messagesEl.appendChild(el);
+                });
+                scrollBottom();
+              });
+            }
+          } else {
+            appendMessage(msg);
+          }
+          loadContacts();
+        } catch (_) {}
+      };
+      evtSource.onerror = () => {
+        statusEl.textContent = 'reconectando...';
+        statusEl.className = 'disconnected';
+        evtSource.close();
+        setTimeout(connectSSE, 2000);
+      };
+    }
+
+    // Theme
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('hb-theme', theme);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'light' ? 'dark' : 'light';
+      setTheme(next);
+      applyCustomTheme();
+    }
+
+    function applyCustomTheme() {
+      const ct = localStorage.getItem('hb-custom-theme');
+      if (!ct) return;
+      try {
+        const vars = JSON.parse(ct);
+        const base = document.documentElement.getAttribute('data-theme') || 'dark';
+        const themeVars = vars[base];
+        if (themeVars) {
+          Object.entries(themeVars).forEach(([k, v]) => {
+            document.documentElement.style.setProperty(k, v);
+          });
+        }
+      } catch (_) {}
+    }
+
+    function openThemeEditor() {
+      const saved = localStorage.getItem('hb-custom-theme');
+      let vars = { dark: {}, light: {} };
+      if (saved) try { vars = JSON.parse(saved); } catch (_) {}
+
+      modalTitle.textContent = 'Personalizar tema';
+      modalBody.innerHTML = `
+        <div id="theme-editor">
+          <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Personaliz\u00e1 colores y tama\u00f1o para los modos oscuro y claro.</p>
+          <div class="te-row">
+            <div class="form-group">
+              <label>Fondo app (oscuro)</label>
+              <input type="color" class="form-input" id="ct-dark-bg-body" value="${vars.dark['--bg-body'] || '#1a1a1a'}">
+            </div>
+            <div class="form-group">
+              <label>Fondo app (claro)</label>
+              <input type="color" class="form-input" id="ct-light-bg-body" value="${vars.light['--bg-body'] || '#f8f9fa'}">
+            </div>
+          </div>
+          <div class="te-row">
+            <div class="form-group">
+              <label>Header (oscuro)</label>
+              <input type="color" class="form-input" id="ct-dark-bg-header" value="${vars.dark['--bg-header'] || '#080808'}">
+            </div>
+            <div class="form-group">
+              <label>Header (claro)</label>
+              <input type="color" class="form-input" id="ct-light-bg-header" value="${vars.light['--bg-header'] || '#1a1a1a'}">
+            </div>
+          </div>
+          <div class="te-row">
+            <div class="form-group">
+              <label>Texto (oscuro)</label>
+              <input type="color" class="form-input" id="ct-dark-color-text" value="${vars.dark['--color-text'] || '#e0e0e0'}">
+            </div>
+            <div class="form-group">
+              <label>Texto (claro)</label>
+              <input type="color" class="form-input" id="ct-light-color-text" value="${vars.light['--color-text'] || '#55595c'}">
+            </div>
+          </div>
+          <div class="te-row">
+            <div class="form-group">
+              <label>Acento (oscuro)</label>
+              <input type="color" class="form-input" id="ct-dark-color-accent" value="${vars.dark['--color-accent'] || '#d9534f'}">
+            </div>
+            <div class="form-group">
+              <label>Acento (claro)</label>
+              <input type="color" class="form-input" id="ct-light-color-accent" value="${vars.light['--color-accent'] || '#d9534f'}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Tama\u00f1o fuente: <span id="ct-font-size-val">${vars.dark['--font-size'] || '14px'}</span></label>
+            <input type="range" min="10" max="20" value="${parseInt(vars.dark['--font-size'] || '14')}" id="ct-font-size">
+          </div>
+        </div>
+      `;
+      modalFooter.innerHTML = `
+        <button class="btn" onclick="resetCustomTheme()">Restablecer</button>
+        <button class="btn btn-primary" onclick="saveCustomTheme()">Guardar</button>
+      `;
+      modalOverlay.classList.remove('hidden');
+
+      document.getElementById('ct-font-size').addEventListener('input', function() {
+        document.getElementById('ct-font-size-val').textContent = this.value + 'px';
+      });
+    }
+
+    function saveCustomTheme() {
+      const base = document.documentElement.getAttribute('data-theme') || 'dark';
+      const prefix = base === 'dark' ? 'ct-dark-' : 'ct-light-';
+      const vars = { dark: {}, light: {} };
+      for (const mode of ['dark', 'light']) {
+        const p = 'ct-' + mode + '-';
+        const bgBody = document.getElementById(p + 'bg-body');
+        if (bgBody) vars[mode]['--bg-body'] = bgBody.value;
+        const bgHeader = document.getElementById(p + 'bg-header');
+        if (bgHeader) vars[mode]['--bg-header'] = bgHeader.value;
+        const colorText = document.getElementById(p + 'color-text');
+        if (colorText) vars[mode]['--color-text'] = colorText.value;
+        const colorAccent = document.getElementById(p + 'color-accent');
+        if (colorAccent) vars[mode]['--color-accent'] = colorAccent.value;
+      }
+      const fs = document.getElementById('ct-font-size');
+      if (fs) {
+        const val = fs.value + 'px';
+        vars.dark['--font-size'] = val;
+        vars.light['--font-size'] = val;
+        document.documentElement.style.setProperty('--font-size', val);
+      }
+      localStorage.setItem('hb-custom-theme', JSON.stringify(vars));
+      applyCustomTheme();
+      closeModal();
+    }
+
+    function resetCustomTheme() {
+      localStorage.removeItem('hb-custom-theme');
+      const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      document.documentElement.removeAttribute('style');
+      setTheme(theme);
+      closeModal();
+    }
+
+    const savedTheme = localStorage.getItem('hb-theme');
+    if (savedTheme) setTheme(savedTheme);
+    applyCustomTheme();
+
+    // Emoji picker
+    const EMOJIS = ['😊','😂','❤️','🔥','👍','🎉','😍','🤔','👋','🙏','💪','✨','😢','😡','🥳','🤯','😴','👀','💀','💯','✅','❌','⭐','🌈','🍕','🎸','🚀','📱','💻','🎯','🏆','⚡','💡','📌','🔔','🎵','🎬','📷','✏️','📎','🔗'];
+    const emojiPanel = document.getElementById('emoji-panel');
+    EMOJIS.forEach(e => {
+      const btn = document.createElement('button');
+      btn.textContent = e;
+      btn.addEventListener('click', () => {
+        inputEl.focus();
+        const start = inputEl.selectionStart;
+        const end = inputEl.selectionEnd;
+        inputEl.value = inputEl.value.substring(0, start) + e + inputEl.value.substring(end);
+        inputEl.selectionStart = inputEl.selectionEnd = start + e.length;
+        inputEl.focus();
+        emojiPanel.classList.remove('open');
+      });
+      emojiPanel.appendChild(btn);
+    });
+
+    document.getElementById('btn-emoji').addEventListener('click', (e) => {
+      e.stopPropagation();
+      emojiPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#btn-emoji') && !e.target.closest('.emoji-panel')) {
+        emojiPanel.classList.remove('open');
+      }
+    });
+
+    // Button listeners
+    document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+    document.getElementById('btn-custom-theme').addEventListener('click', openThemeEditor);
+    document.getElementById('btn-data').addEventListener('click', openDataManager);
+    document.getElementById('btn-add-contact').addEventListener('click', openAddContact);
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+    document.getElementById('btn-show-all').addEventListener('click', () => {
+      blockedOnly = false;
+      renderContactList(contacts);
+    });
+
+    filterInput.addEventListener('input', () => {
+      const q = filterInput.value.toLowerCase();
+      const filtered = contacts.filter(c => {
+        const name = (c.alias || c.name || c.username || '').toLowerCase();
+        return name.includes(q);
+      });
+      renderContactList(filtered);
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!uploadingFile) sendMessage();
+      }
+    });
+    sendBtn.addEventListener('click', sendMessage);
+
+    loadContacts();
+    connectSSE();
+  </script>
+</body>
+</html>
