@@ -125,7 +125,7 @@ def send(contact_id):
     if not text:
         return jsonify({"error": "El mensaje no puede estar vacío"}), 400
     try:
-        msg = bot.send_message(contact_id, text)
+        msg = bot.send_message(contact_id, text, reply_to_msg_id=data.get("reply_to_msg_id"))
         _broadcast(msg)
         return jsonify(msg), 201
     except Exception as e:
@@ -142,6 +142,9 @@ def upload_file(contact_id):
         return jsonify({"error": "Empty filename"}), 400
 
     caption = request.form.get("caption", "").strip()
+    reply_to_msg_id = request.form.get("reply_to_msg_id")
+    if reply_to_msg_id is not None:
+        reply_to_msg_id = int(reply_to_msg_id)
     ext = os.path.splitext(f.filename)[1].lower()
 
     file_type = None
@@ -159,7 +162,7 @@ def upload_file(contact_id):
     f.save(abs_path)
 
     try:
-        msg = bot.send_message(contact_id, caption, file_path=rel_dir, file_type=file_type, file_name=f.filename)
+        msg = bot.send_message(contact_id, caption, file_path=rel_dir, file_type=file_type, file_name=f.filename, reply_to_msg_id=reply_to_msg_id)
         _broadcast(msg)
         return jsonify(msg), 201
     except Exception as e:

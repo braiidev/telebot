@@ -34,6 +34,8 @@ def init_db():
             file_path TEXT,
             file_name TEXT,
             file_size INTEGER,
+            reply_to_msg_id INTEGER,
+            telegram_msg_id INTEGER,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -45,6 +47,17 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_messages_contact ON messages(contact_id, id);
     """)
     conn.commit()
+    # migration: add reply_to_msg_id if missing (existing DBs)
+    try:
+        conn.execute("ALTER TABLE messages ADD COLUMN reply_to_msg_id INTEGER")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE messages ADD COLUMN telegram_msg_id INTEGER")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     conn.close()
 
 
@@ -125,15 +138,15 @@ def get_contacts():
     return [dict(r) for r in rows]
 
 
-def save_message(contact_id, text, sender, from_user=None, file_type=None, file_path=None, file_name=None, file_size=None):
+def save_message(contact_id, text, sender, from_user=None, file_type=None, file_path=None, file_name=None, file_size=None, reply_to_msg_id=None, telegram_msg_id=None):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO messages (contact_id, text, sender, from_user, file_type, file_path, file_name, file_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (contact_id, text, sender, from_user, file_type, file_path, file_name, file_size),
+        "INSERT INTO messages (contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, reply_to_msg_id, telegram_msg_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, reply_to_msg_id, telegram_msg_id),
     )
     conn.commit()
     row = conn.execute(
-        "SELECT id, contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, created_at FROM messages WHERE id = last_insert_rowid()"
+        "SELECT id, contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, reply_to_msg_id, telegram_msg_id, created_at FROM messages WHERE id = last_insert_rowid()"
     ).fetchone()
     conn.close()
     return dict(row)
@@ -142,7 +155,16 @@ def save_message(contact_id, text, sender, from_user=None, file_type=None, file_
 def get_messages(contact_id, limit=100):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, created_at FROM messages WHERE contact_id = ? ORDER BY created_at ASC, id ASC LIMIT ?",
+        """SELECT m.id, m.contact_id, m.text, m.sender, m.from_user,
+                  m.file_type, m.file_path, m.file_name, m.file_size,
+                  m.reply_to_msg_id, m.created_at,
+                  r.text AS reply_to_text, r.sender AS reply_to_sender,
+                  r.from_user AS reply_to_from_user, r.file_type AS reply_to_file_type
+           FROM messages m
+           LEFT JOIN messages r ON r.id = m.reply_to_msg_id
+           WHERE m.contact_id = ?
+           ORDER BY m.created_at ASC, m.id ASC
+           LIMIT ?""",
         (contact_id, limit),
     ).fetchall()
     conn.close()
@@ -181,3 +203,20 @@ def clear_message_file(msg_id):
     conn.execute("UPDATE messages SET file_path = NULL, file_name = NULL, file_size = NULL WHERE id = ?", (msg_id,))
     conn.commit()
     conn.close()
+
+
+def find_message_by_text(contact_id, text):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, telegram_msg_id FROM messages WHERE contact_id = ? AND text = ? ORDER BY created_at DESC LIMIT 1",
+        (contact_id, text),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_telegram_msg_id(msg_id):
+    conn = get_conn()
+    row = conn.execute("SELECT telegram_msg_id FROM messages WHERE id = ?", (msg_id,)).fetchone()
+    conn.close()
+    return row["telegram_msg_id"] if row else None

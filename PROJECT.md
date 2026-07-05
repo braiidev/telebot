@@ -54,8 +54,8 @@ app.py (entry point)
 | POST | `/api/contacts` | Añadir contacto | `{telegram_id, name?, username?, alias?}` |
 | PUT | `/api/contacts/:id` | Editar contacto | `{name?, alias?, blocked?}` |
 | DELETE | `/api/contacts/:id` | Eliminar contacto y sus mensajes | — |
-| GET | `/api/messages/:contact_id` | Historial de mensajes | — |
-| POST | `/api/send/:contact_id` | Enviar mensaje | `{text}` |
+| GET | `/api/messages/:contact_id` | Historial de mensajes (incluye `reply_to_msg_id` y datos del mensaje referenciado) | — |
+| POST | `/api/send/:contact_id` | Enviar mensaje | `{text, reply_to_msg_id?}` |
 | POST | `/api/read/:contact_id` | Marcar como leído | `{msg_id}` |
 | GET | `/api/events` | SSE — notificaciones en tiempo real | — |
 | GET | `/data/<path>` | Sirve archivos (audio, video, imagen, avatar, etc.) | — |
@@ -103,6 +103,7 @@ python3 app.py
 - **Bloqueo visual**: Contactos bloqueados muestran un ícono SVG de círculo tachado (color danger) en lugar del emoji 🚫.
 - **Fotos de perfil**: Cuando un contacto envía un mensaje, el bot descarga su foto de perfil de Telegram y la guarda en `data/avatars/{id}.jpg`. La UI la muestra en la lista de contactos y el header del chat. Si no tiene foto, se muestra la inicial del nombre.
 - **Auto-scroll**: Al abrir un chat, la vista se posiciona en el último mensaje. Si hay imágenes cargando, se re-posiciona automáticamente al terminar.
+- **Reply a mensajes**: Cada mensaje tiene un botón de responder (SVG de flecha) que aparece al hover. Al hacer clic, se muestra una barra "Respondiendo" sobre el input. El mensaje enviado incluye `reply_to_msg_id`. Los mensajes que son respuestas muestran el mensaje original referenciado con un borde izquierdo rojo. Al hacer clic en la referencia, la vista se desplaza al mensaje original.
 
 ## Base de datos
 

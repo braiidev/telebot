@@ -240,12 +240,86 @@ body {
 }
 .msg-document:hover { text-decoration: underline; }
 
+/* REPLY PREVIEW */
+.reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  background: var(--bg-chat-header);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+}
+.reply-preview.hidden { display: none; }
+.reply-preview-content { flex: 1; min-width: 0; }
+.reply-preview-label { font-weight: 600; color: var(--color-accent); font-size: 11px; display: block; }
+.reply-preview-text { color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.reply-preview-close {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.reply-preview-close:hover { color: var(--color-text); }
+
+/* MSG REPLY REFERENCE */
+.msg-reply-ref {
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-left: 3px solid var(--color-accent);
+  background: var(--bg-body);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.msg-reply-ref:hover { opacity: 0.8; }
+.msg-reply-label { font-weight: 600; color: var(--color-accent); display: block; font-size: 11px; }
+.msg-reply-preview { color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* MSG META (time + reply button) */
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.msg-meta .time {
+  font-size: 10px;
+  opacity: 0.5;
+}
+.msg-reply-btn {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.message:hover .msg-reply-btn { opacity: 0.6; }
+.msg-reply-btn:hover { opacity: 1 !important; background: var(--bg-contact-hover); }
+
 #input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: var(--bg-header);
+  border-top: 1px solid var(--color-border);
+}
+#input-row {
   display: flex;
   gap: 6px;
   padding: 10px 16px;
-  background: var(--bg-header);
-  border-top: 1px solid var(--color-border);
 }
 
 #input {

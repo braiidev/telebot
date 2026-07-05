@@ -104,6 +104,17 @@ async def _handle_message(update, context):
         db.upsert_contact(contact_id, user.full_name, user.username)
         await _save_avatar(context.bot, contact_id)
 
+        # resolve reply_to reference from Telegram
+        reply_to_id = None
+        if msg_obj.reply_to_message:
+            rm = msg_obj.reply_to_message
+            reply_text = rm.text or rm.caption or ""
+            found = db.find_message_by_text(contact_id, reply_text)
+            if found:
+                reply_to_id = found["id"]
+
+        kw = dict(contact_id=contact_id, sender="them", from_user=user.full_name, reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
+
         # Check for file attachments
         if msg_obj.audio:
             a = msg_obj.audio
@@ -111,14 +122,16 @@ async def _handle_message(update, context):
             ext = os.path.splitext(file.file_path or ".mp3")[1]
             rel_path, filename = await _download_and_save(file, contact_id, file.file_unique_id, ext, "audio")
             msg = db.save_message(contact_id, caption, "them", from_user=user.full_name,
-                                  file_type="audio", file_path=rel_path, file_name=a.file_name or filename, file_size=a.file_size)
+                                  file_type="audio", file_path=rel_path, file_name=a.file_name or filename, file_size=a.file_size,
+                                  reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Audio from {user.full_name}: {filename}")
         elif msg_obj.voice:
             v = msg_obj.voice
             file = await v.get_file()
             rel_path, filename = await _download_and_save(file, contact_id, file.file_unique_id, ".ogg", "audio")
             msg = db.save_message(contact_id, caption, "them", from_user=user.full_name,
-                                  file_type="audio", file_path=rel_path, file_name="voice.ogg", file_size=v.file_size)
+                                  file_type="audio", file_path=rel_path, file_name="voice.ogg", file_size=v.file_size,
+                                  reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Voice from {user.full_name}")
         elif msg_obj.video:
             v = msg_obj.video
@@ -126,14 +139,16 @@ async def _handle_message(update, context):
             ext = os.path.splitext(file.file_path or ".mp4")[1]
             rel_path, filename = await _download_and_save(file, contact_id, file.file_unique_id, ext, "video")
             msg = db.save_message(contact_id, caption, "them", from_user=user.full_name,
-                                  file_type="video", file_path=rel_path, file_name=filename, file_size=v.file_size)
+                                  file_type="video", file_path=rel_path, file_name=filename, file_size=v.file_size,
+                                  reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Video from {user.full_name}: {filename}")
         elif msg_obj.photo:
             photo = msg_obj.photo[-1]
             file = await photo.get_file()
             rel_path, filename = await _download_and_save(file, contact_id, file.file_unique_id, ".jpg", "image")
             msg = db.save_message(contact_id, caption, "them", from_user=user.full_name,
-                                  file_type="image", file_path=rel_path, file_name=filename, file_size=photo.file_size)
+                                  file_type="image", file_path=rel_path, file_name=filename, file_size=photo.file_size,
+                                  reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Photo from {user.full_name}: {filename}")
         elif msg_obj.document:
             d = msg_obj.document
@@ -141,11 +156,12 @@ async def _handle_message(update, context):
             ext = os.path.splitext(d.file_name or file.file_path or ".dat")[1]
             rel_path, filename = await _download_and_save(file, contact_id, file.file_unique_id, ext, "document")
             msg = db.save_message(contact_id, caption, "them", from_user=user.full_name,
-                                  file_type="document", file_path=rel_path, file_name=d.file_name or filename, file_size=d.file_size)
+                                  file_type="document", file_path=rel_path, file_name=d.file_name or filename, file_size=d.file_size,
+                                  reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Document from {user.full_name}: {d.file_name}")
         elif msg_obj.text:
             text = msg_obj.text
-            msg = db.save_message(contact_id, text, "them", from_user=user.full_name)
+            msg = db.save_message(contact_id, text, "them", from_user=user.full_name, reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
             logger.info(f"Text from {user.full_name}: {text[:60]}")
         else:
             logger.debug(f"Unhandled message type from {user.full_name}")
@@ -157,29 +173,32 @@ async def _handle_message(update, context):
         logger.error(f"Handler error: {e}", exc_info=True)
 
 
-async def _send_message(contact_id, text, file_path=None, file_type=None, file_name=None):
+async def _send_message(contact_id, text, file_path=None, file_type=None, file_name=None, reply_to_msg_id=None):
     b = Bot(TOKEN)
+    tg_reply_id = db.get_telegram_msg_id(reply_to_msg_id) if reply_to_msg_id else None
     if file_path and file_type:
         abs_path = os.path.join(DATA_DIR, file_path)
         with open(abs_path, "rb") as f:
             if file_type == "image":
-                await b.send_photo(chat_id=contact_id, photo=f, caption=text)
+                sent = await b.send_photo(chat_id=contact_id, photo=f, caption=text, reply_to_message_id=tg_reply_id)
             elif file_type == "audio":
-                await b.send_audio(chat_id=contact_id, audio=f, caption=text, title=file_name)
+                sent = await b.send_audio(chat_id=contact_id, audio=f, caption=text, title=file_name, reply_to_message_id=tg_reply_id)
             elif file_type == "video":
-                await b.send_video(chat_id=contact_id, video=f, caption=text)
+                sent = await b.send_video(chat_id=contact_id, video=f, caption=text, reply_to_message_id=tg_reply_id)
             else:
-                await b.send_document(chat_id=contact_id, document=f, caption=text, filename=file_name)
+                sent = await b.send_document(chat_id=contact_id, document=f, caption=text, filename=file_name, reply_to_message_id=tg_reply_id)
         return db.save_message(contact_id, text, "me", from_user="Tú",
-                               file_type=file_type, file_path=file_path, file_name=file_name)
+                               file_type=file_type, file_path=file_path, file_name=file_name,
+                               reply_to_msg_id=reply_to_msg_id, telegram_msg_id=sent.message_id)
     else:
-        await b.send_message(chat_id=contact_id, text=text)
-        return db.save_message(contact_id, text, "me", from_user="Tú")
+        sent = await b.send_message(chat_id=contact_id, text=text, reply_to_message_id=tg_reply_id)
+        return db.save_message(contact_id, text, "me", from_user="Tú",
+                               reply_to_msg_id=reply_to_msg_id, telegram_msg_id=sent.message_id)
 
 
-def send_message(contact_id, text, file_path=None, file_type=None, file_name=None):
+def send_message(contact_id, text, file_path=None, file_type=None, file_name=None, reply_to_msg_id=None):
     async def _run():
-        return await _send_message(contact_id, text, file_path, file_type, file_name)
+        return await _send_message(contact_id, text, file_path, file_type, file_name, reply_to_msg_id)
     future = asyncio.run_coroutine_threadsafe(_run(), _bot_loop)
     return future.result()
 
