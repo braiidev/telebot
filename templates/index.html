@@ -12,6 +12,7 @@
     <div id="header">
       <h1>HomeBot</h1>
         <div id="header-actions">
+          <button id="btn-notif" class="icon-btn" title="Notificaciones: Sonido + Push" data-mode="all"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-dot"></span></button>
           <button id="btn-theme" class="icon-btn" title="Cambiar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
           <button id="btn-custom-theme" class="icon-btn" title="Personalizar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.83-.12 2.68-.35a1 1 0 0 0 .82-1.12 2.04 2.04 0 0 1 1.46-2.4A2.04 2.04 0 0 0 18 16a2 2 0 0 1 2-2 1 1 0 0 0 1.05-.86A10 10 0 0 0 12 2z"/></svg></button>
           <button id="btn-data" class="icon-btn" title="Administrar datos"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></button>
@@ -75,6 +76,10 @@
   </div>
 
   <script>
+    const NOTIF_MODES = ['all', 'sound', 'push', 'none'];
+    const NOTIF_LABELS = { all: 'Sonido + Push', sound: 'Solo Sonido', push: 'Solo Push', none: 'Desactivado' };
+    let notifMode = localStorage.getItem('hb-notif-mode') || 'all';
+
     // Show error from ?error=... query param
     const errParam = new URLSearchParams(location.search).get('error');
     if (errParam) alert(decodeURIComponent(errParam));
@@ -100,6 +105,49 @@
     const filterInput = document.getElementById('contact-filter');
     const fileInput = document.getElementById('file-input');
     const btnFile = document.getElementById('btn-file');
+    const btnNotif = document.getElementById('btn-notif');
+
+    function updateNotifBtn() {
+      btnNotif.title = 'Notificaciones: ' + NOTIF_LABELS[notifMode];
+      btnNotif.dataset.mode = notifMode.replace('none', 'off');
+    }
+
+    function playNotifSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      } catch (_) {}
+    }
+
+    function showNotifPush(msg) {
+      try {
+        if (Notification.permission !== 'granted') return;
+        const body = msg.text || msg.file_name || 'Nuevo mensaje';
+        new Notification('HomeBot', { body });
+      } catch (_) {}
+    }
+
+    function cycleNotif() {
+      const idx = NOTIF_MODES.indexOf(notifMode);
+      notifMode = NOTIF_MODES[(idx + 1) % NOTIF_MODES.length];
+      localStorage.setItem('hb-notif-mode', notifMode);
+      updateNotifBtn();
+      if ((notifMode === 'all' || notifMode === 'push') && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    updateNotifBtn();
+    btnNotif.addEventListener('click', cycleNotif);
 
     function esc(str) {
       const d = document.createElement('div');
@@ -754,6 +802,10 @@
             }
           } else {
             appendMessage(msg);
+            if (msg.sender === 'them' || msg.sender === 'bot') {
+              if (notifMode === 'all' || notifMode === 'sound') playNotifSound();
+              if (notifMode === 'all' || notifMode === 'push') showNotifPush(msg);
+            }
           }
           loadContacts();
         } catch (_) {}

@@ -122,6 +122,23 @@ body {
 .icon-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
 .icon-btn svg { display: block; }
 
+#btn-notif { position: relative; }
+#btn-notif .notif-dot { display: none; }
+#btn-notif[data-mode="all"] svg { color: var(--color-accent); }
+#btn-notif[data-mode="sound"] svg { color: #4bbf73; }
+#btn-notif[data-mode="push"] .notif-dot {
+  display: block;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+#btn-notif[data-mode="off"] { opacity: 0.4; }
+#btn-notif[data-mode="off"] svg { color: var(--color-muted); }
+
 #status { font-size: 11px; color: rgba(255,255,255,0.6); }
 #status.connected { color: var(--color-success); }
 #status.disconnected { color: var(--color-danger); }
