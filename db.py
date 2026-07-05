@@ -146,7 +146,14 @@ def save_message(contact_id, text, sender, from_user=None, file_type=None, file_
     )
     conn.commit()
     row = conn.execute(
-        "SELECT id, contact_id, text, sender, from_user, file_type, file_path, file_name, file_size, reply_to_msg_id, telegram_msg_id, created_at FROM messages WHERE id = last_insert_rowid()"
+        """SELECT m.id, m.contact_id, m.text, m.sender, m.from_user,
+                  m.file_type, m.file_path, m.file_name, m.file_size,
+                  m.reply_to_msg_id, m.telegram_msg_id, m.created_at,
+                  r.text AS reply_to_text, r.sender AS reply_to_sender,
+                  r.from_user AS reply_to_from_user, r.file_type AS reply_to_file_type
+           FROM messages m
+           LEFT JOIN messages r ON r.id = m.reply_to_msg_id
+           WHERE m.id = last_insert_rowid()"""
     ).fetchone()
     conn.close()
     return dict(row)
