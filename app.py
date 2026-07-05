@@ -26,6 +26,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 @app.errorhandler(404)
 def not_found(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Ruta de API inexistente"}), 404
     return redirect("/?error=Ruta+inexistente")
 
 _sse_queues = []

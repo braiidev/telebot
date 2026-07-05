@@ -107,13 +107,10 @@ async def _handle_message(update, context):
         # resolve reply_to reference from Telegram
         reply_to_id = None
         if msg_obj.reply_to_message:
-            rm = msg_obj.reply_to_message
-            reply_text = rm.text or rm.caption or ""
-            found = db.find_message_by_text(contact_id, reply_text)
+            tg_msg_id = msg_obj.reply_to_message.message_id
+            found = db.find_message_by_telegram_id(contact_id, tg_msg_id)
             if found:
                 reply_to_id = found["id"]
-
-        kw = dict(contact_id=contact_id, sender="them", from_user=user.full_name, reply_to_msg_id=reply_to_id, telegram_msg_id=msg_obj.message_id)
 
         # Check for file attachments
         if msg_obj.audio:

@@ -78,7 +78,8 @@
   <script>
     const NOTIF_MODES = ['all', 'sound', 'push', 'none'];
     const NOTIF_LABELS = { all: 'Sonido + Push', sound: 'Solo Sonido', push: 'Solo Push', none: 'Desactivado' };
-    let notifMode = localStorage.getItem('hb-notif-mode') || 'all';
+    let notifMode = 'all';
+    try { notifMode = localStorage.getItem('hb-notif-mode') || 'all'; } catch (_) {}
 
     // Show error from ?error=... query param
     const errParam = new URLSearchParams(location.search).get('error');
@@ -131,15 +132,17 @@
     function showNotifPush(msg) {
       try {
         if (Notification.permission !== 'granted') return;
+        const c = contacts.find(x => x.telegram_id === msg.contact_id);
+        const name = c ? (c.alias || c.name || c.username || 'Desconocido') : 'Desconocido';
         const body = msg.text || msg.file_name || 'Nuevo mensaje';
-        new Notification('HomeBot', { body });
+        new Notification('Mensaje de ' + name, { body });
       } catch (_) {}
     }
 
     function cycleNotif() {
       const idx = NOTIF_MODES.indexOf(notifMode);
       notifMode = NOTIF_MODES[(idx + 1) % NOTIF_MODES.length];
-      localStorage.setItem('hb-notif-mode', notifMode);
+      try { localStorage.setItem('hb-notif-mode', notifMode); } catch (_) {}
       updateNotifBtn();
       if ((notifMode === 'all' || notifMode === 'push') && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -802,7 +805,7 @@
             }
           } else {
             appendMessage(msg);
-            if (msg.sender === 'them' || msg.sender === 'bot') {
+            if ((msg.sender === 'them' || msg.sender === 'bot') && msg.contact_id !== activeContactId) {
               if (notifMode === 'all' || notifMode === 'sound') playNotifSound();
               if (notifMode === 'all' || notifMode === 'push') showNotifPush(msg);
             }
@@ -821,7 +824,7 @@
     // Theme
     function setTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('hb-theme', theme);
+      try { localStorage.setItem('hb-theme', theme); } catch (_) {}
     }
 
     function toggleTheme() {
@@ -832,7 +835,8 @@
     }
 
     function applyCustomTheme() {
-      const ct = localStorage.getItem('hb-custom-theme');
+      let ct = null;
+      try { ct = localStorage.getItem('hb-custom-theme'); } catch (_) {}
       if (!ct) return;
       try {
         const vars = JSON.parse(ct);
@@ -847,7 +851,8 @@
     }
 
     function openThemeEditor() {
-      const saved = localStorage.getItem('hb-custom-theme');
+      let saved = null;
+      try { saved = localStorage.getItem('hb-custom-theme'); } catch (_) {}
       let vars = { dark: {}, light: {} };
       if (saved) try { vars = JSON.parse(saved); } catch (_) {}
 
@@ -934,7 +939,7 @@
         vars.light['--font-size'] = val;
         document.documentElement.style.setProperty('--font-size', val);
       }
-      localStorage.setItem('hb-custom-theme', JSON.stringify(vars));
+      try { localStorage.setItem('hb-custom-theme', JSON.stringify(vars)); } catch (_) {}
       applyCustomTheme();
       closeModal();
     }
@@ -947,7 +952,7 @@
       closeModal();
     }
 
-    const savedTheme = localStorage.getItem('hb-theme');
+    const savedTheme = (() => { try { return localStorage.getItem('hb-theme'); } catch (_) { return null; } })();
     if (savedTheme) setTheme(savedTheme);
     applyCustomTheme();
 

@@ -215,6 +215,16 @@ def find_message_by_text(contact_id, text):
     return dict(row) if row else None
 
 
+def find_message_by_telegram_id(contact_id, telegram_msg_id):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, telegram_msg_id FROM messages WHERE contact_id = ? AND telegram_msg_id = ?",
+        (contact_id, telegram_msg_id),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def get_telegram_msg_id(msg_id):
     conn = get_conn()
     row = conn.execute("SELECT telegram_msg_id FROM messages WHERE id = ?", (msg_id,)).fetchone()
