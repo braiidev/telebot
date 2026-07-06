@@ -18,6 +18,7 @@ import bot
 import db
 
 WEB_TOKEN = os.getenv("WEB_TOKEN", "")
+AUTO_LOCK_MINUTES = int(os.getenv("AUTO_LOCK_MINUTES", "5"))
 
 
 def require_auth(f):
@@ -117,6 +118,11 @@ def index():
 @require_auth
 def auth_check():
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/auth/config")
+def auth_config():
+    return jsonify({"autoLockMinutes": AUTO_LOCK_MINUTES})
 
 
 @app.route("/api/contacts")

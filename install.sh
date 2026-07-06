@@ -282,6 +282,7 @@ case "$CMD" in
     echo "  set port NUM    Cambia PORT (defecto: 8080)"
     echo "  set debug on|off  Activa/desactiva modo debug"
     echo "  set web_token CL  Clave de acceso web (vacío=desactivar)"
+    echo "  set auto_lock MIN Auto-lock por inactividad (0=desactivar)"
     echo "  set show        Muestra la configuración actual"
     echo "  uninstall       Elimina telebot por completo"
     echo "  help            Muestra esta ayuda"
@@ -387,6 +388,19 @@ case "$CMD" in
         fi
         echo "WEB_TOKEN actualizado. Reiniciá el bot: telebot restart"
         ;;
+      auto_lock|autolock)
+        if [[ -z "$VAL" ]]; then
+          echo "Uso: telebot set auto_lock <minutos>"
+          echo "  0 = desactivar auto-lock por inactividad"
+          exit 1
+        fi
+        if grep -q '^AUTO_LOCK_MINUTES=' "$ENV_FILE"; then
+          sed -i "s|^AUTO_LOCK_MINUTES=.*|AUTO_LOCK_MINUTES=$VAL|" "$ENV_FILE"
+        else
+          echo "AUTO_LOCK_MINUTES=$VAL" >> "$ENV_FILE"
+        fi
+        echo "Auto-lock configurado a $VAL minuto(s). Reiniciá el bot: telebot restart"
+        ;;
       show)
         echo "=== Configuración actual ($ENV_FILE) ==="
         while IFS='=' read -r k v; do
@@ -400,7 +414,7 @@ case "$CMD" in
         done < "$ENV_FILE"
         ;;
       *)
-        echo "Uso: telebot set {token|host|port|debug|web_token|show}"
+        echo "Uso: telebot set {token|host|port|debug|web_token|auto_lock|show}"
         exit 1
         ;;
     esac

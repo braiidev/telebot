@@ -16,6 +16,7 @@
           <button id="btn-theme" class="icon-btn" title="Cambiar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
           <button id="btn-custom-theme" class="icon-btn" title="Personalizar tema"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.83-.12 2.68-.35a1 1 0 0 0 .82-1.12 2.04 2.04 0 0 1 1.46-2.4A2.04 2.04 0 0 0 18 16a2 2 0 0 1 2-2 1 1 0 0 0 1.05-.86A10 10 0 0 0 12 2z"/></svg></button>
           <button id="btn-data" class="icon-btn" title="Administrar datos"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></button>
+          <button id="btn-lock" class="icon-btn" title="Cerrar sesión"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
           <span id="status">conectando...</span>
         </div>
     </div>
@@ -1049,6 +1050,7 @@
       }
     });
     sendBtn.addEventListener('click', sendMessage);
+    document.getElementById('btn-lock').addEventListener('click', lockSession);
 
     // Login flow
     const loginOverlay = document.getElementById('login-overlay');
@@ -1084,6 +1086,28 @@
       if (e.key === 'Enter') loginBtn.click();
     });
 
+    // Auto-lock
+    let autoLockTimer = null;
+    let autoLockMinutes = 0;
+
+    function lockSession() {
+      if (autoLockTimer) { clearTimeout(autoLockTimer); autoLockTimer = null; }
+      try { sessionStorage.removeItem('hb-token'); } catch (_) {}
+      loginOverlay.style.display = 'flex';
+      loginInput.value = '';
+      loginError.style.display = 'none';
+      loginInput.focus();
+    }
+
+    function resetAutoLock() {
+      if (autoLockTimer) clearTimeout(autoLockTimer);
+      if (autoLockMinutes > 0) autoLockTimer = setTimeout(lockSession, autoLockMinutes * 60 * 1000);
+    }
+
+    document.addEventListener('click', resetAutoLock);
+    document.addEventListener('keydown', resetAutoLock);
+    document.addEventListener('mousemove', resetAutoLock);
+
     // Auto-login with stored token
     (async function () {
       if (getToken()) {
@@ -1107,6 +1131,10 @@
       }
     });
     connectSSE();
+    fetch('/api/auth/config').then(r => r.json()).then(cfg => {
+      autoLockMinutes = cfg.autoLockMinutes || 0;
+      resetAutoLock();
+    }).catch(() => {});
     }
   </script>
 </body>
