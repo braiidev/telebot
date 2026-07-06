@@ -13,6 +13,7 @@ ok()    { echo -e "${GREEN}OK${NC}    $1"; }
 warn()  { echo -e "${YELLOW}WARN${NC}  $1"; }
 err()   { echo -e "${RED}ERR${NC}   $1"; }
 
+TMPDIR=""
 cleanup() { rm -rf "$TMPDIR"; }
 trap cleanup EXIT
 
@@ -102,7 +103,7 @@ fi
 
 # ── 4. Dependencies ──────────────────────────────────────────────
 info "Instalando dependencias de Python..."
-pip install -r "$INSTALL_DIR/requirements.txt" 2>&1 | tail -1
+python3 -m pip install --break-system-packages -r "$INSTALL_DIR/requirements.txt" 2>&1 | tail -1
 ok "Dependencias instaladas"
 
 # ── 5. Systemd service files ───────────────────────────────────
