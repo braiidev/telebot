@@ -23,6 +23,7 @@ Opens `http://localhost:8080`. Token must be set in `.env` as `TOKEN=<value>`.
 - `set -euo pipefail` + `trap cleanup EXIT` references `$TMPDIR` before init → crashes when directory already exists. Fix: set `TMPDIR=""` before trap.
 - Uses bare `pip` → `command not found`. Fix: replace with `python3 -m pip`.
 - Does not handle `--break-system-packages`.
+- `read` prompts read from stdin (the pipe) when using `curl ... | bash`, consuming script content and causing syntax errors. Fix: redirect each `read` with `< /dev/tty`.
 - `.env` is overwritten cleanly but script crashes before creating services or CLI commands.
 
 ## Architecture
