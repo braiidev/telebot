@@ -12,9 +12,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory
+from functools import wraps
 
 import bot
 import db
+
+WEB_TOKEN = os.getenv("WEB_TOKEN", "")
+
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if WEB_TOKEN:
+            auth = request.headers.get("Authorization", "")
+            token = request.args.get("token", "")
+            if not (auth == f"Bearer {WEB_TOKEN}" or token == WEB_TOKEN):
+                return jsonify({"error": "No autorizado"}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -98,7 +113,14 @@ def index():
     })
 
 
+@app.route("/api/auth/check")
+@require_auth
+def auth_check():
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/contacts")
+@require_auth
 def list_contacts():
     contacts = db.get_contacts()
     for c in contacts:
@@ -108,6 +130,7 @@ def list_contacts():
 
 
 @app.route("/api/contacts", methods=["POST"])
+@require_auth
 def add_contact():
     data = request.get_json(force=True)
     telegram_id = data.get("telegram_id")
@@ -127,6 +150,7 @@ def add_contact():
 
 
 @app.route("/api/contacts/<int:telegram_id>", methods=["PUT"])
+@require_auth
 def edit_contact(telegram_id):
     data = request.get_json(force=True)
     contact = db.update_contact(
@@ -141,23 +165,27 @@ def edit_contact(telegram_id):
 
 
 @app.route("/api/contacts/<int:telegram_id>", methods=["DELETE"])
+@require_auth
 def remove_contact(telegram_id):
     db.delete_contact(telegram_id)
     return "", 204
 
 
 @app.route("/api/messages/<int:contact_id>")
+@require_auth
 def get_messages(contact_id):
     return jsonify(db.get_messages(contact_id))
 
 
 @app.route("/api/messages/<int:contact_id>", methods=["DELETE"])
+@require_auth
 def delete_messages(contact_id):
     db.delete_messages(contact_id)
     return "", 204
 
 
 @app.route("/api/send/<int:contact_id>", methods=["POST"])
+@require_auth
 def send(contact_id):
     data = request.get_json(force=True)
     text = data.get("text", "").strip()
@@ -173,6 +201,7 @@ def send(contact_id):
 
 
 @app.route("/api/upload/<int:contact_id>", methods=["POST"])
+@require_auth
 def upload_file(contact_id):
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -216,6 +245,7 @@ def serve_data(filename):
 
 
 @app.route("/api/data/info")
+@require_auth
 def data_info():
     folders = []
     total_files = 0
@@ -241,6 +271,7 @@ def data_info():
 
 
 @app.route("/api/data/clean", methods=["POST"])
+@require_auth
 def clean_data():
     data = request.get_json(force=True)
     folder_type = data.get("type", "all")
@@ -276,6 +307,7 @@ def clean_data():
 
 
 @app.route("/api/read/<int:contact_id>", methods=["POST"])
+@require_auth
 def mark_read(contact_id):
     data = request.get_json(force=True) or {}
     msg_id = data.get("msg_id", 0)
@@ -358,6 +390,7 @@ def notifier_events():
 
 
 @app.route("/api/notifier/mode", methods=["POST"])
+@require_auth
 def set_notifier_mode():
     data = request.get_json(force=True)
     mode = data.get("mode", "all")
@@ -369,6 +402,7 @@ def set_notifier_mode():
 
 
 @app.route("/api/notifier/status")
+@require_auth
 def notifier_status():
     r = subprocess.run(
         ["systemctl", "--user", "is-active", "telebot-notifier"],
@@ -385,6 +419,7 @@ def notifier_status():
 
 
 @app.route("/api/heartbeat", methods=["POST"])
+@require_auth
 def heartbeat():
     data = request.get_json(force=True)
     global _browser_visible, _last_heartbeat

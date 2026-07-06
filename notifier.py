@@ -24,8 +24,10 @@ logger = logging.getLogger("notifier")
 
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = os.getenv("PORT", "8080")
+WEB_TOKEN = os.getenv("WEB_TOKEN", "")
 BASE_URL = f"http://{HOST}:{PORT}"
-SSE_URL = f"{BASE_URL}/api/notifier/events"
+TOKEN_QS = f"?token={WEB_TOKEN}" if WEB_TOKEN else ""
+SSE_URL = f"{BASE_URL}/api/notifier/events{TOKEN_QS}"
 WEB_URL = BASE_URL
 DEBOUNCE_SEC = 3
 AUTOCLOSE_SEC = 8

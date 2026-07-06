@@ -64,6 +64,16 @@
     </div>
   </div>
 
+  <div id="login-overlay">
+    <div id="login-box">
+      <h2>HomeBot</h2>
+      <p style="color:var(--color-muted);margin:8px 0 16px">Ingresá la clave de acceso</p>
+      <input type="password" id="login-input" placeholder="Clave" autofocus style="width:100%;padding:10px;border:1px solid var(--color-border);border-radius:6px;background:var(--bg-body);color:var(--color-text);font-size:14px;box-sizing:border-box">
+      <p id="login-error" style="color:var(--color-danger);font-size:13px;margin:8px 0 0;display:none">Clave incorrecta</p>
+      <button id="login-btn" style="width:100%;margin-top:12px;padding:10px;border:none;border-radius:6px;background:var(--color-accent);color:#fff;font-size:14px;cursor:pointer">Ingresar</button>
+    </div>
+  </div>
+
   <div id="modal-overlay" class="hidden">
     <div id="modal">
       <div id="modal-header">
@@ -80,6 +90,23 @@
     const NOTIF_LABELS = { all: 'Sonido + Push', push: 'Solo Push', sound: 'Solo Sonido', none: 'Desactivado' };
     let notifMode = 'all';
     try { notifMode = localStorage.getItem('hb-notif-mode') || 'all'; } catch (_) {}
+
+    // Auth
+    function getToken() { try { return sessionStorage.getItem('hb-token'); } catch (_) { return null; } }
+    function setToken(t) { try { sessionStorage.setItem('hb-token', t); } catch (_) {} }
+
+    function api(path, opts) {
+      opts = opts || {};
+      opts.headers = opts.headers || {};
+      const token = getToken();
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(path, opts);
+    }
+
+    function authToken() {
+      const t = getToken();
+      return t ? 'token=' + encodeURIComponent(t) : '';
+    }
 
     // Show error from ?error=... query param
     const errParam = new URLSearchParams(location.search).get('error');
@@ -144,14 +171,14 @@
       notifMode = NOTIF_MODES[(idx + 1) % NOTIF_MODES.length];
       try { localStorage.setItem('hb-notif-mode', notifMode); } catch (_) {}
       updateNotifBtn();
-      fetch('/api/notifier/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mode: notifMode}) });
+      api('/api/notifier/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mode: notifMode}) });
       if ((notifMode === 'all' || notifMode === 'push') && Notification.permission === 'default') {
         Notification.requestPermission();
       }
     }
 
     function sendHeartbeat() {
-      fetch('/api/heartbeat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({visible: !document.hidden}) });
+      api('/api/heartbeat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({visible: !document.hidden}) });
     }
 
     updateNotifBtn();
@@ -342,7 +369,7 @@
       scrollBottom();
 
       if (msg.sender === 'them') {
-        fetch(`/api/read/${activeContactId}`, {
+        api(`/api/read/${activeContactId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ msg_id: msg.id }),
@@ -390,7 +417,7 @@
 
     async function loadContacts() {
       try {
-        const res = await fetch('/api/contacts');
+        const res = await api('/api/contacts');
         contacts = await res.json();
         renderContactList(contacts);
       } catch (e) {
@@ -434,7 +461,7 @@
       `;
 
       try {
-        const res = await fetch(`/api/messages/${contactId}`);
+        const res = await api(`/api/messages/${contactId}`);
         const msgs = await res.json();
         messagesEl.innerHTML = '';
         msgs.forEach(m => {
@@ -446,7 +473,7 @@
 
         if (msgs.length > 0) {
           const lastId = msgs[msgs.length - 1].id;
-          await fetch(`/api/read/${contactId}`, {
+          await api(`/api/read/${contactId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ msg_id: lastId }),
@@ -499,7 +526,7 @@
       const alias = document.getElementById('f-alias').value.trim();
       const blocked = document.getElementById('f-blocked').checked;
       try {
-        const res = await fetch(`/api/contacts/${contactId}`, {
+        const res = await api(`/api/contacts/${contactId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, username, alias, blocked }),
@@ -524,7 +551,7 @@
     async function deleteContact(contactId) {
       if (!confirm('\u00bfEliminar contacto y todos sus mensajes?')) return;
       try {
-        await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+        await api(`/api/contacts/${contactId}`, { method: 'DELETE' });
         closeModal();
         if (activeContactId === contactId) closeChat();
         loadContacts();
@@ -536,7 +563,7 @@
     async function deleteChat(contactId) {
       if (!confirm('\u00bfEliminar solo los mensajes de este chat? El contacto se conservar\u00e1.')) return;
       try {
-        await fetch(`/api/messages/${contactId}`, { method: 'DELETE' });
+        await api(`/api/messages/${contactId}`, { method: 'DELETE' });
         closeModal();
         if (activeContactId === contactId) closeChat();
         loadContacts();
@@ -577,7 +604,7 @@
       modalOverlay.classList.remove('hidden');
 
       try {
-        const res = await fetch('/api/data/info');
+        const res = await api('/api/data/info');
         const info = await res.json();
         renderDataManager(info);
       } catch (e) {
@@ -632,7 +659,7 @@
 
       modalFooter.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin:0 auto"></span>';
       try {
-        const res = await fetch('/api/data/clean', {
+        const res = await api('/api/data/clean', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: mode }),
@@ -682,7 +709,7 @@
       const alias = document.getElementById('f-new-alias').value.trim();
       if (!telegram_id) return alert('El ID de Telegram es obligatorio');
       try {
-        const res = await fetch('/api/contacts', {
+        const res = await api('/api/contacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -732,7 +759,7 @@
       const body = { text };
       if (replyToMsg) body.reply_to_msg_id = replyToMsg.id;
       try {
-        const res = await fetch(`/api/send/${activeContactId}`, {
+        const res = await api(`/api/send/${activeContactId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -768,7 +795,7 @@
         if (caption) form.append('caption', caption);
         inputEl.value = '';
 
-        const res = await fetch(`/api/upload/${activeContactId}`, {
+        const res = await api(`/api/upload/${activeContactId}`, {
           method: 'POST',
           body: form,
         });
@@ -789,7 +816,7 @@
     function connectSSE() {
       statusEl.textContent = 'conectando...';
       statusEl.className = '';
-      const evtSource = new EventSource('/api/events');
+      const evtSource = new EventSource('/api/events?' + authToken());
       evtSource.onopen = () => {
         statusEl.textContent = 'conectado';
         statusEl.className = 'connected';
@@ -801,7 +828,7 @@
           if (msg.type === 'data_cleaned') {
             if (msg.affected && activeContactId) {
               // Reload messages for active contact to show deleted states
-              fetch(`/api/messages/${activeContactId}`).then(r => r.json()).then(msgs => {
+              api(`/api/messages/${activeContactId}`).then(r => r.json()).then(msgs => {
                 messagesEl.innerHTML = '';
                 msgs.forEach(m => {
                   const el = renderMessage(m);
@@ -1023,6 +1050,50 @@
     });
     sendBtn.addEventListener('click', sendMessage);
 
+    // Login flow
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginInput = document.getElementById('login-input');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+
+    async function tryLogin(token) {
+      try {
+        const res = await api('/api/auth/check', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+          setToken(token);
+          loginOverlay.style.display = 'none';
+          initApp();
+        } else {
+          loginError.style.display = 'block';
+        }
+      } catch (_) {
+        loginError.style.display = 'block';
+      }
+    }
+
+    loginBtn.addEventListener('click', () => {
+      const t = loginInput.value.trim();
+      if (t) tryLogin(t);
+    });
+    loginInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loginBtn.click();
+    });
+
+    // Auto-login with stored token
+    (async function () {
+      if (getToken()) {
+        const res = await api('/api/auth/check');
+        if (res.ok) {
+          loginOverlay.style.display = 'none';
+          initApp();
+          return;
+        }
+      }
+      loginOverlay.style.display = 'flex';
+      loginInput.focus();
+    })();
+
+    function initApp() {
     loadContacts().then(() => {
       const contactParam = new URLSearchParams(location.search).get('contact');
       if (contactParam) {
@@ -1031,6 +1102,7 @@
       }
     });
     connectSSE();
+    }
   </script>
 </body>
 </html>
