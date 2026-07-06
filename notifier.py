@@ -5,6 +5,7 @@ Click "Abrir" to open the web app in the corresponding chat.
 
 import json
 import logging
+import os
 import queue
 import threading
 import time
@@ -12,13 +13,20 @@ import tkinter as tk
 import urllib.request
 import webbrowser
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("notifier")
 
-SSE_URL = "http://localhost:8080/api/notifier/events"
-WEB_URL = "http://localhost:8080"
+HOST = os.getenv("HOST", "127.0.0.1")
+PORT = os.getenv("PORT", "8080")
+BASE_URL = f"http://{HOST}:{PORT}"
+SSE_URL = f"{BASE_URL}/api/notifier/events"
+WEB_URL = BASE_URL
 DEBOUNCE_SEC = 3
 AUTOCLOSE_SEC = 8
 

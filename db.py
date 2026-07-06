@@ -217,16 +217,6 @@ def clear_message_file(msg_id):
     conn.close()
 
 
-def find_message_by_text(contact_id, text):
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT id, telegram_msg_id FROM messages WHERE contact_id = ? AND text = ? ORDER BY created_at DESC LIMIT 1",
-        (contact_id, text),
-    ).fetchone()
-    conn.close()
-    return dict(row) if row else None
-
-
 def find_message_by_telegram_id(contact_id, telegram_msg_id):
     conn = get_conn()
     row = conn.execute(

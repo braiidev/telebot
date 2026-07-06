@@ -82,8 +82,8 @@ app.py (entry point)
 
 ### SSE — Server-Sent Events
 
-- `/api/events`: El navegador se conecta aquí. Cada conexión incrementa `_sse_count`. El servidor usa esto para saber si hay al menos un browser abierto.
-- `/api/notifier/events`: El notifier de escritorio se conecta aquí. NO afecta `_sse_count`, evitando loops infinitos.
+- `/api/events`: El navegador se conecta aquí.
+- `/api/notifier/events`: El notifier de escritorio se conecta aquí (cola separada, no cuenta para conexiones del browser).
 - Ambos emiten un comentario vacío (`:\n\n`) al abrir la conexión para forzar `onopen` en el navegador.
 
 ### 404

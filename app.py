@@ -34,7 +34,6 @@ def not_found(e):
 
 _sse_queues = []
 _sse_lock = threading.Lock()
-_sse_count = 0
 _notifier_queues = []
 _browser_visible = False
 _last_heartbeat = 0.0
@@ -289,8 +288,6 @@ def events():
     q = queue.Queue(maxsize=100)
     with _sse_lock:
         _sse_queues.append(q)
-        global _sse_count
-        _sse_count += 1
 
     def generate():
         yield ":\n\n"
@@ -311,8 +308,6 @@ def events():
             with _sse_lock:
                 if q in _sse_queues:
                     _sse_queues.remove(q)
-                    global _sse_count
-                    _sse_count -= 1
 
     return Response(
         generate(),
