@@ -109,7 +109,9 @@ class DesktopNotifier:
         while self._running:
             try:
                 msg = self._msg_queue.get(timeout=1)
+                logger.info(f"Showing popup for contact {msg.get('contact_id')}")
                 self._show_popup(msg)
+                logger.info("Popup closed")
             except queue.Empty:
                 continue
 
@@ -121,14 +123,18 @@ class DesktopNotifier:
                 req.add_header("Cache-Control", "no-cache")
                 response = urllib.request.urlopen(req, timeout=None)
                 retry_delay = 2
-                buffer = ""
+                buf = ""
                 while self._running:
-                    chunk = response.read(4096).decode("utf-8", errors="replace")
-                    if not chunk:
+                    try:
+                        byte = response.read(1)
+                    except Exception:
                         break
-                    buffer += chunk
-                    while "\n\n" in buffer:
-                        event, buffer = buffer.split("\n\n", 1)
+                    if not byte:
+                        break
+                    buf += byte.decode("utf-8", errors="replace")
+                    if buf.endswith("\n\n"):
+                        event = buf[:-2]
+                        buf = ""
                         for line in event.split("\n"):
                             if line.startswith("data: "):
                                 data = line[6:]
@@ -140,7 +146,7 @@ class DesktopNotifier:
                                     pass
             except Exception as e:
                 if self._running:
-                    logger.warning(f"SSE error: {e}, retry in {retry_delay}s")
+                    logger.warning(f"SSE connection error: {e}, retry in {retry_delay}s")
                     time.sleep(retry_delay)
                     retry_delay = min(retry_delay * 1.5, 30)
 

@@ -4,6 +4,7 @@ import os
 import queue
 import subprocess
 import threading
+import time
 import uuid
 
 from dotenv import load_dotenv
@@ -35,6 +36,8 @@ _sse_queues = []
 _sse_lock = threading.Lock()
 _sse_count = 0
 _notifier_queues = []
+_browser_visible = False
+_last_heartbeat = 0.0
 
 
 def _systemd_notifier(action):
@@ -48,11 +51,12 @@ def _systemd_notifier(action):
 
 def _sync_notifier():
     mode = db.get_pref("notif_mode", "all")
-    sse_count = _sse_count
-    logger.info(f"_sync_notifier: mode={mode} sse_count={sse_count}")
+    now = time.time()
+    recent = _browser_visible and (now - _last_heartbeat < 30)
+    logger.info(f"_sync_notifier: mode={mode} visible={_browser_visible} heartbeat_age={now - _last_heartbeat:.0f}s recent={recent}")
     if mode == "none":
         _systemd_notifier("stop")
-    elif sse_count > 0:
+    elif recent:
         _systemd_notifier("stop")
     else:
         _systemd_notifier("start")
@@ -79,6 +83,7 @@ def _broadcast(msg):
                 _sse_queues.remove(q)
             if q in _notifier_queues:
                 _notifier_queues.remove(q)
+    _sync_notifier()
 
 
 bot.set_sse_callback(_broadcast)
@@ -283,21 +288,28 @@ def events():
         _sse_queues.append(q)
         global _sse_count
         _sse_count += 1
-    _sync_notifier()
 
     def generate():
         yield ":\n\n"
+        last_ka = time.time()
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data, default=str)}\n\n"
+                now = time.time()
+                if now - last_ka >= 25:
+                    yield ":\n\n"
+                    last_ka = now
+                try:
+                    data = q.get(timeout=5)
+                    yield f"data: {json.dumps(data, default=str)}\n\n"
+                    last_ka = time.time()
+                except queue.Empty:
+                    pass
         except GeneratorExit:
             with _sse_lock:
                 if q in _sse_queues:
                     _sse_queues.remove(q)
                     global _sse_count
                     _sse_count -= 1
-            _sync_notifier()
 
     return Response(
         generate(),
@@ -318,10 +330,19 @@ def notifier_events():
 
     def generate():
         yield ":\n\n"
+        last_ka = time.time()
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data, default=str)}\n\n"
+                now = time.time()
+                if now - last_ka >= 25:
+                    yield ":\n\n"
+                    last_ka = now
+                try:
+                    data = q.get(timeout=5)
+                    yield f"data: {json.dumps(data, default=str)}\n\n"
+                    last_ka = time.time()
+                except queue.Empty:
+                    pass
         except GeneratorExit:
             with _sse_lock:
                 if q in _notifier_queues:
@@ -356,12 +377,37 @@ def notifier_status():
         capture_output=True, text=True, timeout=10,
     )
     mode = db.get_pref("notif_mode", "all")
-    return jsonify({"status": r.stdout.strip() or "inactive", "mode": mode})
+    now = time.time()
+    return jsonify({
+        "status": r.stdout.strip() or "inactive",
+        "mode": mode,
+        "browser_visible": _browser_visible,
+        "heartbeat_age": now - _last_heartbeat,
+    })
+
+
+@app.route("/api/heartbeat", methods=["POST"])
+def heartbeat():
+    data = request.get_json(force=True)
+    global _browser_visible, _last_heartbeat
+    _browser_visible = data.get("visible", True)
+    _last_heartbeat = time.time()
+    _sync_notifier()
+    return jsonify({"status": "ok"})
 
 
 def start_flask():
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8080))
+
+    def periodic_sync():
+        while True:
+            time.sleep(15)
+            _sync_notifier()
+
+    t = threading.Thread(target=periodic_sync, daemon=True)
+    t.start()
+    _sync_notifier()
     debug = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
     if debug:
         logger.warning("DEBUG mode enabled — do not use in production!")

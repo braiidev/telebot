@@ -150,9 +150,15 @@
       }
     }
 
+    function sendHeartbeat() {
+      fetch('/api/heartbeat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({visible: !document.hidden}) });
+    }
+
     updateNotifBtn();
     btnNotif.addEventListener('click', cycleNotif);
-    fetch('/api/notifier/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mode: notifMode}) });
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 10000);
+    document.addEventListener('visibilitychange', sendHeartbeat);
 
     function esc(str) {
       const d = document.createElement('div');

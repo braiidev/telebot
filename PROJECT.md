@@ -152,13 +152,21 @@ Si `DEBUG=true` en `.env`, Flask se inicia en modo debug (NO usar en producción
 
 ### Auto-start/stop del notifier de escritorio
 
-El servidor decide cuándo iniciar/detener `telebot-notifier.service`:
+El servidor decide cuándo iniciar/detener `telebot-notifier.service` usando **heartbeats** en lugar de conexiones SSE:
 
-| Estado del browser | Modo | Notifier |
-|--------------------|------|----------|
-| Conectado (SSE activo) | cualquiera | **STOP** (el browser maneja notifs) |
-| Desconectado (sin SSE) | ≠ `none` | **START** (popups de escritorio) |
-| Desconectado (sin SSE) | `none` | **STOP** (usuario no quiere notifs) |
+| Visibilidad del browser | Último heartbeat | Modo | Notifier |
+|------------------------|-----------------|------|----------|
+| Visible | < 30s | cualquiera ≠ none | **STOP** |
+| Oculta o sin heartbeat | > 30s | cualquiera ≠ none | **START** |
+| Cualquiera | cualquiera | `none` | **STOP** |
+
+### Cómo funciona
+1. El navegador envía un heartbeat (`POST /api/heartbeat`) cada 10 segundos con `{visible: true/false}`.
+2. Al cambiar de pestaña o minimizar (`visibilitychange`), envía un heartbeat inmediato.
+3. Al abrir la página, envía un heartbeat inicial con la visibilidad actual.
+4. El servidor compara la última marca de tiempo: si pasaron más de 30s sin heartbeat, asume que no hay browser.
+5. Un hilo de barrido ejecuta `_sync_notifier()` cada 15s para mantener el estado correcto.
+6. Cada vez que llega un mensaje (`_broadcast`), también se verifica el estado del notifier.
 
 ### Notifier de escritorio (notifier.py)
 
@@ -178,11 +186,7 @@ Al abrir la página, si la URL contiene `?contact=TELEGRAM_ID`, el frontend sele
 
 ### ¿Por qué el notifier no arranca al cerrar las pestañas?
 
-ChromeOS mantiene las pestañas en segundo plano (sesión restaurada) incluso sin ventanas visibles. La conexión SSE sigue activa → `_sse_count > 0` → el notifier no arranca. Soluciones:
-
-1. **Cerrar Chrome completamente** (no solo las ventanas) desde el menú de ChromeOS
-2. **Modo "Desactivado" manual** → frena el notifier forzadamente
-3. **Forzar el notifier manualmente**: `telebot notifier start`
+ChromeOS mantiene las pestañas en segundo plano (sesión restaurada) incluso sin ventanas visibles. Antes esto impedía que el notifier arrancara porque usábamos conexiones SSE. **Ahora está resuelto**: el servidor usa heartbeats + Page Visibility API. Al cambiar de pestaña o minimizar la ventana, el navegador envía un heartbeat con `visible=false` y el notifier arranca al instante — incluso con pestañas abiertas en segundo plano.
 
 ## Interfaz web (SPA)
 
@@ -244,6 +248,17 @@ telebot notifier enable         # Habilitar autostart
 telebot notifier disable        # Deshabilitar autostart
 ```
 
+### Auto-start al encender el PC
+
+El servicio `telebot` arranca automáticamente al boot gracias a `loginctl enable-linger`. No necesitás abrir una terminal Penguin para que funcione.
+
+Si por algún motivo no arranca, verificá:
+```bash
+loginctl show-user $USER | grep Linger    # Debería decir "yes"
+systemctl --user is-enabled telebot        # Debería decir "enabled"
+telebot status                             # Debería estar active (running)
+```
+
 ### Systemd user services
 
 | Servicio | Archivo | Descripción |
@@ -264,6 +279,7 @@ telebot notifier disable        # Deshabilitar autostart
 - **OGG→MP3**: ffmpeg convierte OGG Opus a MP3 al recibir audio. El .ogg original se elimina.
 - **Avatares**: Se descargan automáticamente de Telegram al recibir el primer mensaje de un contacto. Guardados en `data/avatars/{id}.jpg`.
 - **SSE inicial** `:\n\n`: Comentario vacío al abrir conexión para que el navegador dispare `onopen` inmediatamente.
+- **SSE chunked encoding bug**: `http.client.HTTPResponse.read(4096)` no retorna datos en respuestas chunked cuando el chunk es pequeño (e.g., 3 bytes del keepalive). `_safe_read()` en CPython lee `min(amt, 1MB)` bytes de una vez y se bloquea si la respuesta tiene menos datos. Solución: el `notifier.py` lee **byte a byte** (`response.read(1)`) en lugar de bloques de 4096.
 - **Thread safety**: Todas las operaciones sobre `_sse_queues` usan `_sse_lock`.
 - **404**: Las rutas `/api/*` devuelven JSON; las demás redirigen a `/?error=...` con `alert()`.
 - **DB migrations**: `ALTER TABLE ... ADD COLUMN` con `except` pasivo para compatibilidad con DBs existentes.
