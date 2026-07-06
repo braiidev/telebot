@@ -245,10 +245,10 @@ case "$CMD" in
     rm -f "$HOME/.config/systemd/user/$SVC.service"
     rm -f "$HOME/.config/systemd/user/$NOTIFIER_SVC.service"
     systemctl --user daemon-reload
-    echo "Eliminando $DIR..."
-    rm -rf "$DIR"
     echo "Eliminando comandos globales..."
     sudo rm -f /usr/local/bin/tbot /usr/local/bin/telebot
+    echo "Eliminando $DIR..."
+    rm -rf "$DIR"
     echo ""
     echo "✅ telebot desinstalado."
     echo ""
