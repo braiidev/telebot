@@ -19,11 +19,21 @@ Abrí `http://localhost:8080` y listo.
 ## Uso
 
 ```bash
-telebot status      # Estado del bot
-telebot logs        # Logs en vivo
-telebot start|stop
-telebot notifier status   # Estado del notificador de escritorio
-telebot help              # Todos los comandos
+telebot start          # Inicia el bot
+telebot stop           # Detiene bot + notificador
+telebot restart        # Reinicia el bot
+telebot status         # Estado del bot
+telebot enable         # Auto-inicio al boot
+telebot disable        # Quita auto-inicio
+telebot logs           # Logs en vivo
+telebot notifier       # Gestiona notificador (start|stop|restart|status|enable|disable)
+telebot set token TKN  # Cambia token de Telegram
+telebot set host HOST  # Cambia host (defecto: 127.0.0.1)
+telebot set port NUM   # Cambia puerto (defecto: 8080)
+telebot set debug on|off  # Modo debug
+telebot set show       # Muestra configuración
+telebot uninstall      # Elimina telebot por completo
+telebot help           # Todos los comandos
 ```
 
 ## Funcionalidades
