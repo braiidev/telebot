@@ -50,7 +50,7 @@ else
         echo "    git clone $REPO_URL $INSTALL_DIR"
         echo "    $0   (y volvé a ejecutar este script)"
         echo ""
-        read -r -p "¿Copiar desde el directorio actual ($PWD)? [s/N] " COPY
+        read -r -p "¿Copiar desde el directorio actual ($PWD)? [s/N] " COPY < /dev/tty
         if [[ "$COPY" =~ ^[sS]$ ]]; then
             mkdir -p "$INSTALL_DIR"
             cp -a "$PWD"/. "$INSTALL_DIR/"

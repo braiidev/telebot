@@ -23,7 +23,7 @@ Opens `http://localhost:8080`. Token must be set in `.env` as `TOKEN=<value>`.
 - `set -euo pipefail` + `trap cleanup EXIT` references `$TMPDIR` before init → crashes when directory already exists. Fix: set `TMPDIR=""` before trap.
 - Uses bare `pip` → `command not found`. Fix: replace with `python3 -m pip`.
 - Does not handle `--break-system-packages`.
-- `read` prompts read from stdin (the pipe) when using `curl ... | bash`, consuming script content and causing syntax errors. Fix: redirect each `read` with `< /dev/tty`.
+- `read` prompts must use `< /dev/tty` to avoid consuming script content when piped via `curl ... | bash`. Now fixed on all interactive reads.
 - `.env` is overwritten cleanly but script crashes before creating services or CLI commands.
 
 ## Architecture
@@ -59,6 +59,12 @@ PORT=8080
 
 Si `HOST` es distinto de `127.0.0.1` (ej: `0.0.0.0`), `WEB_TOKEN` es **obligatorio** — el servidor no arranca sin él.
 Si está configurado, la web pide clave al cargar. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`. SSE envía el token como query param. El notifier de escritorio también lo incluye.
+
+## Security
+
+- `@require_auth` on `/data/<path>` requires `?token=` query param for media elements (browser can't set headers on `<img>`/`<audio>`/`<video>`). Frontend helper `dataUrl()` appends the token automatically.
+- `lockSession()` closes SSE connection, clears contact list, messages, and resets all state before showing login overlay. Token is removed from `sessionStorage` — even bypassing the overlay with F7 cannot access data without valid API auth.
+- No `@require_auth` on `/api/auth/config` (intentional — frontend needs it before login) and `/api/events` (SSE — auth via `?token=` query param).
 
 ## Notable quirks
 

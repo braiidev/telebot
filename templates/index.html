@@ -108,11 +108,16 @@
       const t = getToken();
       return t ? 'token=' + encodeURIComponent(t) : '';
     }
+    function dataUrl(path) {
+      const t = getToken();
+      return '/data/' + path + (t ? '?token=' + encodeURIComponent(t) : '');
+    }
 
     // Show error from ?error=... query param
     const errParam = new URLSearchParams(location.search).get('error');
     if (errParam) alert(decodeURIComponent(errParam));
 
+    let evtSource = null;
     let activeContactId = null;
     let contacts = [];
     let blockedOnly = false;
@@ -275,9 +280,9 @@
       if (msg.file_type === 'image' && msg.file_path) {
         const img = document.createElement('img');
         img.className = 'msg-file msg-image';
-        img.src = '/data/' + msg.file_path;
+        img.src = dataUrl(msg.file_path);
         img.loading = 'lazy';
-        img.addEventListener('click', () => window.open('/data/' + msg.file_path, '_blank'));
+        img.addEventListener('click', () => window.open(dataUrl(msg.file_path), '_blank'));
         img.addEventListener('error', () => { img.style.display = 'none'; showDeletedFallback(text, msg); });
         text.appendChild(img);
         if (msg.text) {
@@ -291,7 +296,7 @@
         const ext = msg.file_path.split('.').pop().toLowerCase();
         const mime = ext === 'ogg' ? 'audio/ogg; codecs=opus' : ext === 'mp3' ? 'audio/mpeg' : ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/mp4' : '';
         if (mime) audio.setAttribute('type', mime);
-        audio.src = '/data/' + msg.file_path;
+        audio.src = dataUrl(msg.file_path);
         audio.controls = true;
         audio.preload = 'metadata';
         audio.addEventListener('error', () => { audio.remove(); showDeletedFallback(text, msg); });
@@ -304,7 +309,7 @@
       } else if (msg.file_type === 'video' && msg.file_path) {
         const video = document.createElement('video');
         video.className = 'msg-file msg-video';
-        video.src = '/data/' + msg.file_path;
+        video.src = dataUrl(msg.file_path);
         video.controls = true;
         video.preload = 'metadata';
         video.addEventListener('error', () => { video.remove(); showDeletedFallback(text, msg); });
@@ -317,7 +322,7 @@
       } else if (msg.file_type && msg.file_path) {
         const link = document.createElement('a');
         link.className = 'msg-file msg-document';
-        link.href = '/data/' + msg.file_path;
+        link.href = dataUrl(msg.file_path);
         link.target = '_blank';
         link.textContent = (msg.file_name || 'Documento') + ' ' + (msg.file_size ? '(' + (msg.file_size / 1024).toFixed(0) + ' KB)' : '');
         link.addEventListener('click', (e) => {
@@ -391,7 +396,7 @@
 
       li.innerHTML = `
         <div class="ci-avatar">
-          ${c.avatar ? `<img src="/data/avatars/${c.telegram_id}.jpg" class="ci-avatar-img" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">` : ''}
+          ${c.avatar ? `<img src="${dataUrl('avatars/' + c.telegram_id + '.jpg')}" class="ci-avatar-img" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">` : ''}
           <span class="ci-avatar-text">${esc(name[0]).toUpperCase()}</span>
         </div>
         <div class="ci-info">
@@ -445,7 +450,7 @@
       const name = c ? (c.alias || c.name || c.username || String(contactId)) : String(contactId);
       chatHeader.innerHTML = `
         <div class="ch-info">
-          ${c && c.avatar ? `<img src="/data/avatars/${contactId}.jpg" class="ch-avatar" onerror="this.style.display='none'">` : ''}
+          ${c && c.avatar ? `<img src="${dataUrl('avatars/' + contactId + '.jpg')}" class="ch-avatar" onerror="this.style.display='none'">` : ''}
           <span class="ch-name">${esc(name)}</span>
         </div>
         <div class="ch-actions">
@@ -815,9 +820,10 @@
     });
 
     function connectSSE() {
+      if (evtSource) evtSource.close();
       statusEl.textContent = 'conectando...';
       statusEl.className = '';
-      const evtSource = new EventSource('/api/events?' + authToken());
+      evtSource = new EventSource('/api/events?' + authToken());
       evtSource.onopen = () => {
         statusEl.textContent = 'conectado';
         statusEl.className = 'connected';
@@ -828,7 +834,6 @@
           const msg = JSON.parse(e.data);
           if (msg.type === 'data_cleaned') {
             if (msg.affected && activeContactId) {
-              // Reload messages for active contact to show deleted states
               api(`/api/messages/${activeContactId}`).then(r => r.json()).then(msgs => {
                 messagesEl.innerHTML = '';
                 msgs.forEach(m => {
@@ -853,6 +858,7 @@
         statusEl.textContent = 'reconectando...';
         statusEl.className = 'disconnected';
         evtSource.close();
+        evtSource = null;
         setTimeout(connectSSE, 2000);
       };
     }
@@ -1093,6 +1099,14 @@
     function lockSession() {
       if (autoLockTimer) { clearTimeout(autoLockTimer); autoLockTimer = null; }
       try { sessionStorage.removeItem('hb-token'); } catch (_) {}
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      contactList.innerHTML = '';
+      messagesEl.innerHTML = '';
+      chatPlaceholder.style.display = 'block';
+      chatActive.style.display = 'none';
+      chatHeader.innerHTML = '';
+      activeContactId = null;
+      contacts = [];
       loginOverlay.style.display = 'flex';
       loginInput.value = '';
       loginError.style.display = 'none';

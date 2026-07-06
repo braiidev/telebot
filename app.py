@@ -246,6 +246,7 @@ def upload_file(contact_id):
 
 
 @app.route("/data/<path:filename>")
+@require_auth
 def serve_data(filename):
     return send_from_directory(DATA_DIR, filename)
 
