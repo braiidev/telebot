@@ -53,11 +53,12 @@ PORT=8080
 ```
 
 `DEBUG=true` enables Flask debug mode (optional).
-`WEB_TOKEN=<clave>` protege la web con autenticación Bearer. Si está vacío (default), no hay autenticación.
+`WEB_TOKEN=<clave>` protege la web con autenticación Bearer. Si está vacío, solo se puede acceder desde localhost.
 
 ## Autenticación
 
-Si `WEB_TOKEN` está definido en `.env`, la web pide clave al cargar. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`. SSE envía el token como query param. El notifier de escritorio también lo incluye.
+Si `HOST` es distinto de `127.0.0.1` (ej: `0.0.0.0`), `WEB_TOKEN` es **obligatorio** — el servidor no arranca sin él.
+Si está configurado, la web pide clave al cargar. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`. SSE envía el token como query param. El notifier de escritorio también lo incluye.
 
 ## Notable quirks
 

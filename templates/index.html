@@ -1063,10 +1063,15 @@
           setToken(token);
           loginOverlay.style.display = 'none';
           initApp();
+        } else if (res.status === 401) {
+          loginError.textContent = 'Clave incorrecta';
+          loginError.style.display = 'block';
         } else {
+          loginError.textContent = 'Error del servidor — ¿está configurado WEB_TOKEN?';
           loginError.style.display = 'block';
         }
       } catch (_) {
+        loginError.textContent = 'No se puede conectar al servidor';
         loginError.style.display = 'block';
       }
     }

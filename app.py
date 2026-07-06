@@ -433,6 +433,14 @@ def start_flask():
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8080))
 
+    is_public = host not in ("127.0.0.1", "localhost", "")
+    if is_public and not WEB_TOKEN:
+        logger.error(
+            f"HOST={host} expone el puerto sin autenticación. "
+            "Configurá WEB_TOKEN en .env o usá HOST=127.0.0.1"
+        )
+        return
+
     def periodic_sync():
         while True:
             time.sleep(15)

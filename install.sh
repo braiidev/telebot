@@ -98,6 +98,20 @@ ENV
         ok ".env creado con valores por defecto (sin token)"
         echo "  ➜  Configurá el token después con: telebot set token"
     fi
+
+    echo ""
+    echo -e "${YELLOW}➜  Clave de acceso web (opcional)${NC}"
+    echo "   Solo necesaria si exponés el puerto (HOST=0.0.0.0)."
+    echo "   Si dejás vacío, solo se puede acceder desde localhost."
+    echo "   Ejemplo: miclave123"
+    echo ""
+    read -r -p "   Clave web (enter para omitir): " WEB_TOKEN < /dev/tty
+    if [[ -n "$WEB_TOKEN" ]]; then
+        echo "WEB_TOKEN=$WEB_TOKEN" >> .env
+        ok "WEB_TOKEN configurado"
+    else
+        ok "Sin clave web — solo accesible desde localhost"
+    fi
     echo "   Podés editar: $INSTALL_DIR/.env"
 fi
 
@@ -267,6 +281,7 @@ case "$CMD" in
     echo "  set host HOST   Cambia HOST (defecto: 127.0.0.1)"
     echo "  set port NUM    Cambia PORT (defecto: 8080)"
     echo "  set debug on|off  Activa/desactiva modo debug"
+    echo "  set web_token CL  Clave de acceso web (vacío=desactivar)"
     echo "  set show        Muestra la configuración actual"
     echo "  uninstall       Elimina telebot por completo"
     echo "  help            Muestra esta ayuda"
@@ -359,10 +374,25 @@ case "$CMD" in
             ;;
         esac
         ;;
+      web_token)
+        if [[ -z "$VAL" ]]; then
+          echo "Uso: telebot set web_token <clave>"
+          echo "  Dejalo vacío para desactivar: telebot set web_token \"\""
+          exit 1
+        fi
+        if grep -q '^WEB_TOKEN=' "$ENV_FILE"; then
+          sed -i "s|^WEB_TOKEN=.*|WEB_TOKEN=$VAL|" "$ENV_FILE"
+        else
+          echo "WEB_TOKEN=$VAL" >> "$ENV_FILE"
+        fi
+        echo "WEB_TOKEN actualizado. Reiniciá el bot: telebot restart"
+        ;;
       show)
         echo "=== Configuración actual ($ENV_FILE) ==="
         while IFS='=' read -r k v; do
-          if [[ "$k" == "TOKEN" && -n "$v" ]]; then
+          if [[ "$k" == "WEB_TOKEN" && -n "$v" ]]; then
+            echo "WEB_TOKEN=${v:0:8}..."
+          elif [[ "$k" == "TOKEN" && -n "$v" ]]; then
             echo "TOKEN=${v:0:8}...${v: -4}"
           else
             echo "$k=$v"
@@ -370,13 +400,14 @@ case "$CMD" in
         done < "$ENV_FILE"
         ;;
       *)
-        echo "Uso: telebot set {token|host|port|debug|show}"
+        echo "Uso: telebot set {token|host|port|debug|web_token|show}"
         exit 1
         ;;
     esac
     ;;
   *)
     echo "Uso: telebot {start|stop|restart|status|enable|disable|logs|notifier|set|uninstall|help}"
+    echo '  Para más ayuda: telebot help'
     exit 1
     ;;
 esac
