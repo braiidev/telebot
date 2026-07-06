@@ -60,7 +60,7 @@ Web UI is open. Default `HOST=127.0.0.1` restricts to localhost.
 
 ## Notable quirks
 
-- `.env` and `homebot.db` are not gitignored — a fresh clone exposes them.
+- `.env` and `homebot.db` are in `.gitignore` — but verify before committing.
 - `drop_pending_updates=True` in `bot.run()` — pending messages during downtime are lost.
 - `hb-custom-theme` in localStorage (private-browsing safe, wrapped in try-catch).
 - `allowed_extensions` dict only applies to web uploads, not Telegram file downloads.

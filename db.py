@@ -193,11 +193,11 @@ def mark_read(contact_id, msg_id):
     conn.close()
 
 
-def get_messages_by_file(file_type, file_name):
+def get_messages_by_file(file_type, file_path):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, contact_id, text, file_type, file_path, file_name FROM messages WHERE file_type = ? AND file_name = ?",
-        (file_type, file_name),
+        "SELECT id, contact_id, text, file_type, file_path, file_name FROM messages WHERE file_type = ? AND file_path = ?",
+        (file_type, file_path),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

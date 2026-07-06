@@ -228,10 +228,13 @@ def data_info():
         if os.path.exists(folder_path):
             for f in os.listdir(folder_path):
                 fpath = os.path.join(folder_path, f)
-                if os.path.isfile(fpath):
-                    fs = os.path.getsize(fpath)
-                    count += 1
-                    size += fs
+                try:
+                    if os.path.isfile(fpath):
+                        fs = os.path.getsize(fpath)
+                        count += 1
+                        size += fs
+                except OSError:
+                    continue
         total_files += count
         total_size += size
         folders.append({"type": folder, "count": count, "size": size})
@@ -263,7 +266,7 @@ def clean_data():
 
     # Update DB: nullify file_path and append deletion notice to text
     for entry in deleted:
-        msgs = db.get_messages_by_file(entry["type"], entry["name"])
+        msgs = db.get_messages_by_file(entry["type"], f"{entry['type']}/{entry['name']}")
         for m in msgs:
             db.update_message_text(m["id"], (m["text"] or "") + f"\n[Archivo eliminado: {entry['name']}]")
             db.clear_message_file(m["id"])
