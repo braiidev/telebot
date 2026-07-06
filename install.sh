@@ -26,7 +26,7 @@ echo ""
 # ── 1. Get the source code ──────────────────────────────────────
 if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/app.py" ]]; then
     info "Ya existe una instalación en $INSTALL_DIR"
-    read -r -p "¿Actualizar? (git pull) [s/N] " CONFIRM
+    read -r -p "¿Actualizar? (git pull) [s/N] " CONFIRM < /dev/tty
     if [[ "$CONFIRM" =~ ^[sS]$ ]]; then
         cd "$INSTALL_DIR"
         git pull || warn "git pull falló, continuando con los archivos existentes"
@@ -71,7 +71,7 @@ ok "Directorios de datos creados en $INSTALL_DIR/data/"
 # ── 3. .env ─────────────────────────────────────────────────────
 if [[ -f .env ]]; then
     info ".env ya existe"
-    read -r -p "¿Sobrescribir? [s/N] " OVERWRITE
+    read -r -p "¿Sobrescribir? [s/N] " OVERWRITE < /dev/tty
     if [[ ! "$OVERWRITE" =~ ^[sS]$ ]]; then
         ok ".env conservado"
     fi
@@ -84,7 +84,7 @@ if [[ ! -f .env || "$OVERWRITE" =~ ^[sS]$ ]]; then
     echo "   Dejalo vacío para configurar después con: telebot set token"
     echo "   Ejemplo: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
     echo ""
-    read -r -p "   Token (enter para omitir): " TOKEN
+    read -r -p "   Token (enter para omitir): " TOKEN < /dev/tty
 
     cat > .env <<ENV
 HOST=127.0.0.1
@@ -412,7 +412,7 @@ echo "  Comandos      : telebot, tbot"
 echo ""
 
 # ── 9. Ask to start ─────────────────────────────────────────────
-read -r -p "¿Iniciar el bot ahora? [S/n] " START
+read -r -p "¿Iniciar el bot ahora? [S/n] " START < /dev/tty
 if [[ ! "$START" =~ ^[nN]$ ]]; then
     info "Habilitando e iniciando servicios..."
     systemctl --user enable telebot
