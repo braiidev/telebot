@@ -76,8 +76,8 @@
   </div>
 
   <script>
-    const NOTIF_MODES = ['all', 'sound', 'push', 'none'];
-    const NOTIF_LABELS = { all: 'Sonido + Push', sound: 'Solo Sonido', push: 'Solo Push', none: 'Desactivado' };
+    const NOTIF_MODES = ['all', 'push', 'sound', 'none'];
+    const NOTIF_LABELS = { all: 'Sonido + Push', push: 'Solo Push', sound: 'Solo Sonido', none: 'Desactivado' };
     let notifMode = 'all';
     try { notifMode = localStorage.getItem('hb-notif-mode') || 'all'; } catch (_) {}
 
@@ -144,6 +144,7 @@
       notifMode = NOTIF_MODES[(idx + 1) % NOTIF_MODES.length];
       try { localStorage.setItem('hb-notif-mode', notifMode); } catch (_) {}
       updateNotifBtn();
+      fetch('/api/notifier/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mode: notifMode}) });
       if ((notifMode === 'all' || notifMode === 'push') && Notification.permission === 'default') {
         Notification.requestPermission();
       }
@@ -151,6 +152,7 @@
 
     updateNotifBtn();
     btnNotif.addEventListener('click', cycleNotif);
+    fetch('/api/notifier/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mode: notifMode}) });
 
     function esc(str) {
       const d = document.createElement('div');
@@ -1015,7 +1017,13 @@
     });
     sendBtn.addEventListener('click', sendMessage);
 
-    loadContacts();
+    loadContacts().then(() => {
+      const contactParam = new URLSearchParams(location.search).get('contact');
+      if (contactParam) {
+        const c = contacts.find(x => x.telegram_id === Number(contactParam));
+        if (c) selectContact(c.telegram_id);
+      }
+    });
     connectSSE();
   </script>
 </body>

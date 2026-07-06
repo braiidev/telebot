@@ -44,6 +44,11 @@ def init_db():
             last_read_msg_id INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS prefs (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_messages_contact ON messages(contact_id, id);
     """)
     conn.commit()
@@ -237,3 +242,20 @@ def get_telegram_msg_id(msg_id):
     row = conn.execute("SELECT telegram_msg_id FROM messages WHERE id = ?", (msg_id,)).fetchone()
     conn.close()
     return row["telegram_msg_id"] if row else None
+
+
+def get_pref(key, default=None):
+    conn = get_conn()
+    row = conn.execute("SELECT value FROM prefs WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+
+def set_pref(key, value):
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO prefs (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+    conn.commit()
+    conn.close()

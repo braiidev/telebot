@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import queue
+import subprocess
 import threading
 import uuid
 
@@ -32,6 +33,30 @@ def not_found(e):
 
 _sse_queues = []
 _sse_lock = threading.Lock()
+_sse_count = 0
+_notifier_queues = []
+
+
+def _systemd_notifier(action):
+    r = subprocess.run(
+        ["systemctl", "--user", action, "telebot-notifier"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if r.returncode != 0:
+        logger.warning(f"systemctl --user {action} notifier failed: {r.stderr.strip()}")
+
+
+def _sync_notifier():
+    mode = db.get_pref("notif_mode", "all")
+    sse_count = _sse_count
+    logger.info(f"_sync_notifier: mode={mode} sse_count={sse_count}")
+    if mode == "none":
+        _systemd_notifier("stop")
+    elif sse_count > 0:
+        _systemd_notifier("stop")
+    else:
+        _systemd_notifier("start")
+
 
 ALLOWED_EXTENSIONS = {
     "image": {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"},
@@ -44,13 +69,16 @@ ALLOWED_EXTENSIONS = {
 def _broadcast(msg):
     with _sse_lock:
         dead = []
-        for q in _sse_queues:
+        for q in _sse_queues + _notifier_queues:
             try:
                 q.put_nowait(msg)
             except queue.Full:
                 dead.append(q)
         for q in dead:
-            _sse_queues.remove(q)
+            if q in _sse_queues:
+                _sse_queues.remove(q)
+            if q in _notifier_queues:
+                _notifier_queues.remove(q)
 
 
 bot.set_sse_callback(_broadcast)
@@ -253,6 +281,9 @@ def events():
     q = queue.Queue(maxsize=100)
     with _sse_lock:
         _sse_queues.append(q)
+        global _sse_count
+        _sse_count += 1
+    _sync_notifier()
 
     def generate():
         yield ":\n\n"
@@ -264,6 +295,9 @@ def events():
             with _sse_lock:
                 if q in _sse_queues:
                     _sse_queues.remove(q)
+                    global _sse_count
+                    _sse_count -= 1
+            _sync_notifier()
 
     return Response(
         generate(),
@@ -274,6 +308,55 @@ def events():
             "Connection": "keep-alive",
         },
     )
+
+
+@app.route("/api/notifier/events")
+def notifier_events():
+    q = queue.Queue(maxsize=100)
+    with _sse_lock:
+        _notifier_queues.append(q)
+
+    def generate():
+        yield ":\n\n"
+        try:
+            while True:
+                data = q.get()
+                yield f"data: {json.dumps(data, default=str)}\n\n"
+        except GeneratorExit:
+            with _sse_lock:
+                if q in _notifier_queues:
+                    _notifier_queues.remove(q)
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.route("/api/notifier/mode", methods=["POST"])
+def set_notifier_mode():
+    data = request.get_json(force=True)
+    mode = data.get("mode", "all")
+    if mode not in ("all", "push", "sound", "none"):
+        return jsonify({"error": "Modo inválido"}), 400
+    db.set_pref("notif_mode", mode)
+    _sync_notifier()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/notifier/status")
+def notifier_status():
+    r = subprocess.run(
+        ["systemctl", "--user", "is-active", "telebot-notifier"],
+        capture_output=True, text=True, timeout=10,
+    )
+    mode = db.get_pref("notif_mode", "all")
+    return jsonify({"status": r.stdout.strip() or "inactive", "mode": mode})
 
 
 def start_flask():
