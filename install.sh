@@ -69,8 +69,8 @@ ok "Directorios de datos creados en $INSTALL_DIR/data/"
 
 # ── 3. .env ─────────────────────────────────────────────────────
 if [[ -f .env ]]; then
-    info ".env ya existe: $(grep -c '^TOKEN=' .env || true) variables configuradas"
-    read -r -p "¿Sobrescribir .env? [s/N] " OVERWRITE
+    info ".env ya existe"
+    read -r -p "¿Sobrescribir? [s/N] " OVERWRITE
     if [[ ! "$OVERWRITE" =~ ^[sS]$ ]]; then
         ok ".env conservado"
     fi
@@ -78,23 +78,26 @@ fi
 
 if [[ ! -f .env || "$OVERWRITE" =~ ^[sS]$ ]]; then
     echo ""
-    echo -e "${YELLOW}➜  Configurar token de Telegram${NC}"
-    echo "   Creá un bot en @BotFather y obtené el token."
+    echo -e "${YELLOW}➜  Token de Telegram${NC}"
+    echo "   Creá un bot en @BotFather y pegá el token."
+    echo "   Dejalo vacío para configurar después con: telebot set token"
     echo "   Ejemplo: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
     echo ""
-    read -r -p "   Token: " TOKEN
-    while [[ -z "$TOKEN" ]]; do
-        warn "El token no puede estar vacío"
-        read -r -p "   Token: " TOKEN
-    done
+    read -r -p "   Token (enter para omitir): " TOKEN
 
     cat > .env <<ENV
-TOKEN=$TOKEN
 HOST=127.0.0.1
 PORT=8080
 ENV
-    ok ".env creado con TOKEN y configuración por defecto (HOST=127.0.0.1 PORT=8080)"
-    echo "   Podés editarlo después en: $INSTALL_DIR/.env"
+
+    if [[ -n "$TOKEN" ]]; then
+        echo "TOKEN=$TOKEN" >> .env
+        ok ".env creado con TOKEN + configuración por defecto"
+    else
+        ok ".env creado con valores por defecto (sin token)"
+        echo "  ➜  Configurá el token después con: telebot set token"
+    fi
+    echo "   Podés editar: $INSTALL_DIR/.env"
 fi
 
 # ── 4. Dependencies ──────────────────────────────────────────────
@@ -188,29 +191,35 @@ case "$CMD" in
     echo "  en tiempo real y popups de escritorio vía tkinter."
     echo ""
     echo "USO"
-    echo "  telebot <comando>"
+    echo "  telebot <comando> [args]"
     echo ""
     echo "COMANDOS"
-    echo "  start       Inicia el bot + servidor web"
-    echo "  stop        Detiene el bot"
-    echo "  restart     Reinicia el bot"
-    echo "  status      Muestra el estado del servicio"
-    echo "  enable      Habilita el inicio automático al boot"
-    echo "  disable     Deshabilita el inicio automático"
-    echo "  logs        Sigue los logs del bot en tiempo real"
-    echo "  notifier    Gestiona el servicio de notificador"
+    echo "  start           Inicia el bot + servidor web"
+    echo "  stop            Detiene el bot"
+    echo "  restart         Reinicia el bot"
+    echo "  status          Muestra el estado del servicio"
+    echo "  enable          Habilita el inicio automático al boot"
+    echo "  disable         Deshabilita el inicio automático"
+    echo "  logs            Sigue los logs en tiempo real"
+    echo "  notifier        Gestiona el servicio de notificador"
     echo "    start|stop|restart|status|enable|disable"
-    echo "  help        Muestra esta ayuda"
+    echo "  set token TKN   Configura el token de Telegram"
+    echo "  set host HOST   Cambia HOST (defecto: 127.0.0.1)"
+    echo "  set port NUM    Cambia PORT (defecto: 8080)"
+    echo "  set debug on|off  Activa/desactiva modo debug"
+    echo "  set show        Muestra la configuración actual"
+    echo "  help            Muestra esta ayuda"
+    echo ""
+    echo "EJEMPLOS"
+    echo "  telebot set token 123456:ABCdef"
+    echo "  telebot set port 9090"
+    echo "  telebot set debug on"
+    echo "  telebot set show"
+    echo "  telebot restart   (para aplicar cambios)"
     echo ""
     echo "INSTALACIÓN EN OTRO DISPOSITIVO"
     echo ""
-    echo "  1. Clonar el repositorio:"
-    echo "     git clone https://github.com/braiidev/telebot ~/.config/telebot"
-    echo ""
-    echo "  2. Ejecutar install.sh:"
-    echo "     bash ~/.config/telebot/install.sh"
-    echo ""
-    echo "  3. Seguir las instrucciones en pantalla."
+    echo "  curl -fsSL https://raw.githubusercontent.com/braiidev/telebot/main/install.sh | bash"
     echo ""
     echo "REQUISITOS"
     echo "  - Python 3.13+"
@@ -219,8 +228,94 @@ case "$CMD" in
     echo "  - systemd (para gestión de servicios)"
     echo "  - sudo (para instalar comandos globales)"
     ;;
+  set)
+    KEY="$2"
+    VAL="$3"
+    ENV_FILE="$DIR/.env"
+    if [[ ! -f "$ENV_FILE" ]]; then
+      echo "Error: no se encuentra $ENV_FILE"
+      echo "Ejecutá install.sh primero o creá el archivo manualmente."
+      exit 1
+    fi
+    case "$KEY" in
+      token)
+        if [[ -z "$VAL" ]]; then
+          echo "Uso: telebot set token <token>"
+          exit 1
+        fi
+        if grep -q '^TOKEN=' "$ENV_FILE"; then
+          sed -i "s|^TOKEN=.*|TOKEN=$VAL|" "$ENV_FILE"
+        else
+          echo "TOKEN=$VAL" >> "$ENV_FILE"
+        fi
+        echo "Token actualizado. Reiniciá el bot: telebot restart"
+        ;;
+      host)
+        if [[ -z "$VAL" ]]; then
+          echo "Uso: telebot set host <host>"
+          exit 1
+        fi
+        if grep -q '^HOST=' "$ENV_FILE"; then
+          sed -i "s|^HOST=.*|HOST=$VAL|" "$ENV_FILE"
+        else
+          echo "HOST=$VAL" >> "$ENV_FILE"
+        fi
+        echo "Host actualizado a $VAL. Reiniciá el bot: telebot restart"
+        ;;
+      port)
+        if [[ -z "$VAL" ]]; then
+          echo "Uso: telebot set port <número>"
+          exit 1
+        fi
+        if grep -q '^PORT=' "$ENV_FILE"; then
+          sed -i "s|^PORT=.*|PORT=$VAL|" "$ENV_FILE"
+        else
+          echo "PORT=$VAL" >> "$ENV_FILE"
+        fi
+        echo "Puerto actualizado a $VAL. Reiniciá el bot: telebot restart"
+        ;;
+      debug)
+        case "$VAL" in
+          on|true|1)
+            if grep -q '^DEBUG=' "$ENV_FILE"; then
+              sed -i 's|^DEBUG=.*|DEBUG=true|' "$ENV_FILE"
+            else
+              echo "DEBUG=true" >> "$ENV_FILE"
+            fi
+            echo "Modo debug activado. Reiniciá el bot: telebot restart"
+            ;;
+          off|false|0)
+            if grep -q '^DEBUG=' "$ENV_FILE"; then
+              sed -i 's|^DEBUG=.*|DEBUG=false|' "$ENV_FILE"
+            else
+              echo "DEBUG=false" >> "$ENV_FILE"
+            fi
+            echo "Modo debug desactivado. Reiniciá el bot: telebot restart"
+            ;;
+          *)
+            echo "Uso: telebot set debug on|off"
+            exit 1
+            ;;
+        esac
+        ;;
+      show)
+        echo "=== Configuración actual ($ENV_FILE) ==="
+        while IFS='=' read -r k v; do
+          if [[ "$k" == "TOKEN" && -n "$v" ]]; then
+            echo "TOKEN=${v:0:8}...${v: -4}"
+          else
+            echo "$k=$v"
+          fi
+        done < "$ENV_FILE"
+        ;;
+      *)
+        echo "Uso: telebot set {token|host|port|debug|show}"
+        exit 1
+        ;;
+    esac
+    ;;
   *)
-    echo "Uso: telebot {start|stop|restart|status|enable|disable|logs|notifier|help}"
+    echo "Uso: telebot {start|stop|restart|status|enable|disable|logs|notifier|set|help}"
     exit 1
     ;;
 esac
