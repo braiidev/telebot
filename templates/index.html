@@ -1069,7 +1069,9 @@
         const res = await api('/api/auth/check', { headers: { 'Authorization': 'Bearer ' + token } });
         if (res.ok) {
           setToken(token);
+          document.getElementById('app').style.display = '';
           loginOverlay.style.display = 'none';
+          location.hash = '';
           initApp();
         } else if (res.status === 401) {
           loginError.textContent = 'Clave incorrecta';
@@ -1102,15 +1104,19 @@
       if (evtSource) { evtSource.close(); evtSource = null; }
       contactList.innerHTML = '';
       messagesEl.innerHTML = '';
-      chatPlaceholder.style.display = 'block';
-      chatActive.style.display = 'none';
+      chatPlaceholder.classList.remove('hidden');
+      chatActive.classList.add('hidden');
       chatHeader.innerHTML = '';
       activeContactId = null;
       contacts = [];
+      document.getElementById('app').style.display = 'none';
+      statusEl.textContent = '';
+      statusEl.className = '';
       loginOverlay.style.display = 'flex';
       loginInput.value = '';
       loginError.style.display = 'none';
       loginInput.focus();
+      location.hash = '#lock';
     }
 
     function resetAutoLock() {
@@ -1124,14 +1130,18 @@
 
     // Auto-login with stored token
     (async function () {
+      if (location.hash === '#lock') document.getElementById('app').style.display = 'none';
       if (getToken()) {
         const res = await api('/api/auth/check');
         if (res.ok) {
+          document.getElementById('app').style.display = '';
           loginOverlay.style.display = 'none';
+          location.hash = '';
           initApp();
           return;
         }
       }
+      document.getElementById('app').style.display = 'none';
       loginOverlay.style.display = 'flex';
       loginInput.focus();
     })();
