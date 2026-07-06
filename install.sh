@@ -163,8 +163,23 @@ SVC="telebot"
 NOTIFIER_SVC="telebot-notifier"
 
 case "$CMD" in
-  start|stop|restart|status|enable|disable)
+  start|enable)
     systemctl --user "$CMD" "$SVC"
+    ;;
+  stop)
+    systemctl --user stop "$NOTIFIER_SVC" 2>/dev/null
+    systemctl --user stop "$SVC"
+    ;;
+  disable)
+    systemctl --user disable "$NOTIFIER_SVC" 2>/dev/null
+    systemctl --user disable "$SVC"
+    ;;
+  restart)
+    systemctl --user stop "$NOTIFIER_SVC" 2>/dev/null
+    systemctl --user restart "$SVC"
+    ;;
+  status)
+    systemctl --user status "$SVC"
     ;;
   notifier)
     ACTION="${2:-status}"
@@ -181,6 +196,50 @@ case "$CMD" in
   log|logs)
     journalctl --user -u "$SVC" -n 50 -f
     ;;
+  uninstall)
+    echo ""
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║           telebot — Uninstall                ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo ""
+    echo "Se va a eliminar lo siguiente:"
+    echo ""
+    echo "  📦 Servicios systemd:"
+    echo "     - $SVC"
+    echo "     - $NOTIFIER_SVC"
+    echo ""
+    echo "  📁 Código y datos: $DIR"
+    echo ""
+    echo "  🔧 Comandos globales:"
+    echo "     - /usr/local/bin/tbot"
+    echo "     - /usr/local/bin/telebot"
+    echo ""
+    echo -n "¿Realmente deseas eliminar telebot? (y/N) "
+    read -r CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[yY]$ ]]; then
+      echo "Cancelado."
+      exit 0
+    fi
+    echo ""
+    echo "Deteniendo servicios..."
+    systemctl --user stop "$NOTIFIER_SVC" 2>/dev/null
+    systemctl --user stop "$SVC" 2>/dev/null
+    systemctl --user disable "$NOTIFIER_SVC" 2>/dev/null
+    systemctl --user disable "$SVC" 2>/dev/null
+    echo "Eliminando servicios systemd..."
+    rm -f "$HOME/.config/systemd/user/$SVC.service"
+    rm -f "$HOME/.config/systemd/user/$NOTIFIER_SVC.service"
+    systemctl --user daemon-reload
+    echo "Eliminando $DIR..."
+    rm -rf "$DIR"
+    echo "Eliminando comandos globales..."
+    sudo rm -f /usr/local/bin/tbot /usr/local/bin/telebot
+    echo ""
+    echo "✅ telebot desinstalado."
+    echo ""
+    echo "Para remover el inicio automático (opcional):"
+    echo "  sudo loginctl disable-linger \$USER"
+    ;;
   help|--help|-h)
     echo "╔══════════════════════════════════════════════════════╗"
     echo "║                    telebot - Help                    ║"
@@ -195,8 +254,8 @@ case "$CMD" in
     echo ""
     echo "COMANDOS"
     echo "  start           Inicia el bot + servidor web"
-    echo "  stop            Detiene el bot"
-    echo "  restart         Reinicia el bot"
+    echo "  stop            Detiene el bot y notificador"
+    echo "  restart         Reinicia el bot (notificador se reajusta solo)"
     echo "  status          Muestra el estado del servicio"
     echo "  enable          Habilita el inicio automático al boot"
     echo "  disable         Deshabilita el inicio automático"
@@ -208,6 +267,7 @@ case "$CMD" in
     echo "  set port NUM    Cambia PORT (defecto: 8080)"
     echo "  set debug on|off  Activa/desactiva modo debug"
     echo "  set show        Muestra la configuración actual"
+    echo "  uninstall       Elimina telebot por completo"
     echo "  help            Muestra esta ayuda"
     echo ""
     echo "EJEMPLOS"
@@ -315,7 +375,7 @@ case "$CMD" in
     esac
     ;;
   *)
-    echo "Uso: telebot {start|stop|restart|status|enable|disable|logs|notifier|set|help}"
+    echo "Uso: telebot {start|stop|restart|status|enable|disable|logs|notifier|set|uninstall|help}"
     exit 1
     ;;
 esac
